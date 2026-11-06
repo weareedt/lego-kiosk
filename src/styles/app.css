@@ -1,0 +1,55 @@
+/* App shell: resets, the scaled stage, and states that aren't in the canvas designs. */
+* { -webkit-tap-highlight-color: transparent; }
+html, body, #root { margin: 0; height: 100%; }
+body {
+  background: #1a1206;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  font-family: "DM Sans", system-ui, sans-serif;
+}
+img { -webkit-user-drag: none; }
+button { border: 0; padding: 0; margin: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: inherit; }
+button:disabled { cursor: default; }
+
+/* The 744×1133 design canvas, scaled to fit the screen (see Stage.tsx). */
+.viewport { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+.stage { width: 744px; height: 1133px; position: relative; flex: none; transform-origin: center center; overflow: hidden; }
+.scr-wrap { position: absolute; inset: 0; }
+.screen-enter { animation: screenIn .28s ease-out both; }
+@keyframes screenIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Shared screen basics for states not in the canvas (camera error) */
+.screen-camera-error.scr { width: 744px; height: 1133px; position: relative; overflow: hidden; display: block; color: #171717; background: #D9A21C; }
+.screen-camera-error .panel { position: absolute; left: 44px; right: 44px; background: #fff; border-radius: 28px; box-shadow: 0 14px 30px rgba(40,20,0,.28); text-align: center; padding: 26px; box-sizing: border-box; }
+.screen-camera-error .pill,
+.idle .pill { position: absolute; display: flex; align-items: center; justify-content: center; gap: 14px; height: 84px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 7px #FFD500, 0 8px 0 7px #E0A800, 0 16px 30px rgba(40,20,0,.35); font-family: "Rubik", sans-serif; font-weight: 800; font-size: 30px; letter-spacing: .5px; text-transform: uppercase; color: #171717; }
+.screen-camera-error .pill2 { position: absolute; display: flex; align-items: center; justify-content: center; height: 76px; border-radius: 999px; background: rgba(255,255,255,.92); box-shadow: 0 8px 18px rgba(40,20,0,.3); font-family: "Rubik", sans-serif; font-weight: 800; font-size: 22px; text-transform: uppercase; color: #171717; }
+
+/* Countdown: driven by React state instead of the looping preview animation */
+.screen-countdown .num-live { opacity: 1; animation: numIn .45s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes numIn { from { opacity: 0; transform: scale(1.9); } to { opacity: 1; transform: scale(1); } }
+.screen-countdown .flash-live { animation: flashOnce .6s ease-out both; }
+@keyframes flashOnce { 0% { opacity: 1; } 100% { opacity: 0; } }
+.screen-countdown .lt { transition: background .15s, color .15s; }
+
+/* Stamp Card tag text */
+.screen-stampcard .tag-head { align-self: stretch; background: #E3000B; color: #fff; text-align: center; font-family: Rubik, sans-serif; font-weight: 900; font-size: 14px; letter-spacing: 1.5px; padding: 9px 0; }
+.screen-stampcard .tag-foot { font-family: Rubik, sans-serif; font-weight: 800; font-size: 13px; letter-spacing: 1.5px; margin-bottom: 14px; color: #4A4135; }
+
+/* Welcome is a full-screen button */
+.screen-welcome.scr { padding: 0; }
+
+/* "Still building?" idle prompt */
+.idle { position: absolute; inset: 0; z-index: 50; background: rgba(20,12,6,.45); display: flex; align-items: flex-end; justify-content: center; animation: screenIn .25s ease-out both; }
+.idle-card { position: relative; width: 656px; margin-bottom: 44px; background: #fff; border-radius: 32px; padding: 30px 30px 26px; box-sizing: border-box; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,.35); animation: idleUp .35s cubic-bezier(.2,1.3,.4,1) both; }
+@keyframes idleUp { from { transform: translateY(60px); } to { transform: none; } }
+.idle-ring { display: flex; justify-content: center; margin-bottom: 10px; }
+.idle-drain { stroke-dasharray: 201; animation: idleDrain linear both; }
+@keyframes idleDrain { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 201; } }
+.idle-sub { margin: 10px 0 28px; font-size: 19px; font-weight: 700; color: #3A3328; }
+.idle .idle-stay { position: relative; width: 420px; margin: 0 auto; }
+.idle-over { display: block; margin: 26px auto 0; font-family: "Rubik", sans-serif; font-weight: 800; font-size: 18px; letter-spacing: 1px; text-transform: uppercase; color: #7A6F5E; padding: 8px 16px; }

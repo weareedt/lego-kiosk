@@ -1,0 +1,10 @@
+{
+  "name": "LEGO Santa's Toy Factory",
+  "short_name": "Toy Factory",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#D9A21C",
+  "theme_color": "#D9A21C",
+  "start_url": "/",
+  "icons": [{ "src": "/assets/lego-logo.png", "sizes": "250x250", "type": "image/png" }]
+}
