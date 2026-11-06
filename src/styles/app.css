@@ -53,3 +53,6 @@ button:disabled { cursor: default; }
 .idle-sub { margin: 10px 0 28px; font-size: 19px; font-weight: 700; color: #3A3328; }
 .idle .idle-stay { position: relative; width: 420px; margin: 0 auto; }
 .idle-over { display: block; margin: 26px auto 0; font-family: "Rubik", sans-serif; font-weight: 800; font-size: 18px; letter-spacing: 1px; text-transform: uppercase; color: #7A6F5E; padding: 8px 16px; }
+
+/* Name: on-screen key lights up when the matching physical key is pressed */
+.screen-name .k.k-hit { transform: translateY(4px); box-shadow: 0 0 0 2px #EFE4CC, 0 1px 0 #E0D0AC; background: #FFF3B0; }
