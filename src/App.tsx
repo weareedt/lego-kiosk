@@ -26,6 +26,8 @@ interface Session {
   photo: string | null;
   character: CharacterId | null;
   qr: string | null;
+  /** The URL encoded in the QR (also exposed as data-href for staff/testing). */
+  qrHref: string | null;
 }
 
 const newSession = (): Session => ({
@@ -35,6 +37,7 @@ const newSession = (): Session => ({
   photo: null,
   character: null,
   qr: null,
+  qrHref: null,
 });
 
 /** Inactivity before the "Still building?" prompt, for screens that have one. */
@@ -75,10 +78,11 @@ export function App() {
     setMatchDone(false);
     go('matching');
     // Lock the result at t = 0 so the reveal and QR are ready when the animation ends.
-    const id = sessionRef.current.id;
+    const { id, name } = sessionRef.current;
     matchGuest(photo).then(async (character) => {
-      const qr = await qrDataUrl(resultUrl(id, character));
-      setSession((s) => (s.id === id ? { ...s, character, qr } : s));
+      const qrHref = resultUrl(id, character, name.trim());
+      const qr = await qrDataUrl(qrHref);
+      setSession((s) => (s.id === id ? { ...s, character, qr, qrHref } : s));
     });
   };
 
@@ -153,7 +157,7 @@ export function App() {
       view = <Matching onDone={() => setMatchDone(true)} />;
       break;
     case 'reveal':
-      view = character ? <Reveal name={displayName} character={character} qr={session.qr} onDone={() => go('stampcard')} /> : <></>;
+      view = character ? <Reveal name={displayName} character={character} qr={session.qr} qrHref={session.qrHref} onDone={() => go('stampcard')} /> : <></>;
       break;
     case 'stampcard':
       view = character ? <StampCard name={displayName} character={character} qr={session.qr} onFinish={reset} /> : <></>;

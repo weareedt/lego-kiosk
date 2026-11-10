@@ -9,22 +9,32 @@ import '@fontsource/dm-sans/700.css';
 import './styles/app.css';
 import './styles/kiosk.css';
 import { App } from './App';
+import { ResultPage } from './result/ResultPage';
 import { CameraProvider } from './lib/camera';
 import { CHARACTER_IDS, type CharacterId } from './lib/characters';
 import { setStaffOverride } from './lib/matching';
 
-// Kiosk hardening: no context menu or pinch/double-tap zoom.
-document.addEventListener('contextmenu', (e) => e.preventDefault());
-document.addEventListener('gesturestart', (e) => e.preventDefault());
+// /match is the guest's phone result page (opened from the kiosk QR); everything else is the kiosk.
+const isResultPage = location.pathname.replace(/\/+$/, '') === '/match';
 
-// Staff override for photo ops: open the kiosk with ?force=santa (one-shot, next guest only).
-const force = new URLSearchParams(location.search).get('force') as CharacterId | null;
-if (force && CHARACTER_IDS.includes(force)) setStaffOverride(force);
+if (!isResultPage) {
+  // Staff override for photo ops: open the kiosk with ?force=santa (one-shot, next guest only).
+  const force = new URLSearchParams(location.search).get('force') as CharacterId | null;
+  if (force && CHARACTER_IDS.includes(force)) setStaffOverride(force);
+
+  // Kiosk hardening: no context menu or pinch/double-tap zoom.
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <CameraProvider>
-      <App />
-    </CameraProvider>
+    {isResultPage ? (
+      <ResultPage />
+    ) : (
+      <CameraProvider>
+        <App />
+      </CameraProvider>
+    )}
   </StrictMode>,
 );

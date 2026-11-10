@@ -15,7 +15,7 @@ const CONFETTI = [
 ];
 
 /** 06 · Character reveal + QR. Moves on to the Stamp Card screen on Done or after idle. */
-export function Reveal(props: { name: string; character: Character; qr: string | null; onDone: () => void }) {
+export function Reveal(props: { name: string; character: Character; qr: string | null; qrHref?: string | null; onDone: () => void }) {
   const c = props.character;
   useIdle(config.idle.reveal, props.onDone);
   return (
@@ -37,15 +37,15 @@ export function Reveal(props: { name: string; character: Character; qr: string |
         <p style={{ margin: '10px 0 0', fontSize: 17, lineHeight: 1.35, fontWeight: 700, color: '#3A2A00' }}>{c.quote}</p>
       </div>
       <div className="qr">
-        {props.qr && <img src={props.qr} alt="QR code to save your match" />}
+        {props.qr && <img src={props.qr} data-href={props.qrHref ?? undefined} alt="QR code to see your match on your phone" />}
         <div>
           <p className="d" style={{ fontSize: 24, lineHeight: 1 }}>
-            Scan to save
+            Scan to see
             <br />
             your match
           </p>
           <p style={{ margin: '6px 0 0', fontSize: 14, fontWeight: 700, color: '#4A4135', lineHeight: 1.3 }}>
-            Save it · Send it to your phone · Redeem at the booth
+            Open it on your phone, then show it at the counter
           </p>
         </div>
       </div>

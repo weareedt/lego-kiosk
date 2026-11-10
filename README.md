@@ -21,7 +21,7 @@ Built with React + Vite + TypeScript. It runs in Safari as a full-screen web app
 | 04 Confirm | Use this photo / Retake | 20 s → “Still building?” |
 | 05 Matching | Automatic (4.5 s), not interruptible | — |
 | 06 Reveal + QR | Done | 60 s → Stamp Card |
-| 07 Stamp Card | Finish | 10 s → reset |
+| 07 Stamp Card | Finish | 20 s → reset |
 
 “Still building?” waits 10 s, then starts over. A reset clears the name, photo and
 match, and stops the camera. If the camera is blocked or missing, the guest sees a
@@ -42,16 +42,36 @@ npm run preview    # serve the build
 The camera needs a **secure context**: HTTPS, or `localhost`. To test on the iPad
 during development, deploy a preview (Vercel) or use an HTTPS tunnel.
 
-### Environment
+### Phone result page (QR)
 
-Copy `.env.example` to `.env.local`:
+The QR on the Reveal and Stamp Card screens opens **`/match`** on the same
+deployment, on the guest’s phone:
 
 ```
-VITE_QR_BASE_URL=https://example.com/match
+/match?s=<session code>&c=<character id>&n=<first name>&t=<unix time>
 ```
 
-The QR on the Reveal and Stamp Card screens points to
-`VITE_QR_BASE_URL?s=<sessionId>&c=<characterId>`.
+It shows their character, their name and a big 6-letter match code to show at the
+redemption counter. Broken links get a friendly “Match not found” message. The
+result lives in the link itself (no backend yet), so staff can check the code
+against the kiosk if needed.
+
+To host it somewhere else, set `VITE_QR_BASE_URL` in `.env.local` (see `.env.example`).
+
+## Tests
+
+```bash
+npm test           # unit tests (Vitest): matching rules, QR links
+npm run test:e2e   # end-to-end (Playwright, Chromium fake camera): builds and runs the app
+npm run test:all   # both
+```
+
+First run of the end-to-end tests needs a browser: `npx playwright install chromium`.
+
+The end-to-end suite covers the full guest journey through to the auto reset, Retake,
+Skip, the keyboard (on-screen and laptop), the staff override, a blocked camera,
+the idle prompt (both outcomes), and the phone result page, including opening the
+kiosk’s QR link on a phone and getting the same character.
 
 ## Deploying to Vercel
 
@@ -82,6 +102,7 @@ src/
     Stage.tsx          Scales the 744×1133 canvas to the screen
     IdlePrompt.tsx     “Still building?” overlay
   screens/             One file per screen (Welcome … StampCard, CameraError)
+  result/              Phone result page opened from the QR (/match)
   lib/
     config.ts          Timings, name length, QR base URL, camera settings
     characters.ts      The 7 characters: copy, colours, images
@@ -128,7 +149,7 @@ to make it real.
 ## Next steps
 
 - [ ] Real face-in-frame check and photo read (e.g. MediaPipe Face Detection, on-device)
-- [ ] Backend for the QR result page (e.g. Firebase: save match + photo, mobile result page)
+- [ ] Backend for verified results (e.g. Firebase: save each match so staff can confirm codes)
 - [ ] Ask the client for the welcome artwork and background exported at 2× iPad size
       (1488 × 2266). The current files are 744 × 1133.
 - [ ] Optional: offline caching (service worker) for patchy venue Wi-Fi

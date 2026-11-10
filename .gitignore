@@ -4,3 +4,5 @@ dist
 .DS_Store
 *.log
 *.tsbuildinfo
+test-results
+playwright-report

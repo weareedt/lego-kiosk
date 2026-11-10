@@ -16,16 +16,16 @@ export const config = {
     promptCountdown: 10_000,
     /** Reveal moves on to the Stamp Card screen after this long without a tap. */
     reveal: 60_000,
-    /** Stamp Card screen resets for the next guest after this long. */
-    stampCard: 10_000,
+    /** Stamp Card screen resets for the next guest after this long (time to scan the QR). */
+    stampCard: 20_000,
   },
 
   countdownSeconds: 3,
   /** Length of the Matching "theatre" animation. */
   matchingDuration: 4_500,
 
-  /** QR target. The session id and character id are appended as query params. */
-  qrBaseUrl: (import.meta.env.VITE_QR_BASE_URL as string | undefined) ?? 'https://example.com/match',
+  /** QR target for the phone result page. Empty = this deployment's /match page. */
+  qrBaseUrl: (import.meta.env.VITE_QR_BASE_URL as string | undefined) ?? '',
 
   camera: {
     width: 1280,

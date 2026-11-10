@@ -18,7 +18,7 @@ export function StampCard(props: { name: string; character: Character; qr: strin
         <p className="d" style={{ fontSize: 22, marginTop: 10, color: '#0B6B3A' }}>
           Head to the counter, {props.name}
         </p>
-        <p style={{ margin: '8px 0 0', fontSize: 18, fontWeight: 700, color: '#3A3328' }}>Show your QR code to our team to get your card.</p>
+        <p style={{ margin: '8px 0 0', fontSize: 18, fontWeight: 700, color: '#3A3328' }}>Scan the QR code and show your match to our team.</p>
       </div>
       <img className="char" src={props.character.image} alt={`${props.character.name} waving`} />
       <svg className="arrow" viewBox="0 0 80 40" aria-hidden="true">
@@ -27,7 +27,7 @@ export function StampCard(props: { name: string; character: Character; qr: strin
       <div className="tag">
         <div className="tag-head">YOUR MATCH · {props.character.name.toUpperCase()}</div>
         {props.qr && <img src={props.qr} alt="QR code" style={{ width: 200, height: 200, margin: '16px 0 8px' }} />}
-        <span className="tag-foot">SHOW THIS AT THE COUNTER</span>
+        <span className="tag-foot">SCAN · SHOW AT THE COUNTER</span>
       </div>
       <button type="button" className="pill" style={{ left: 162, right: 162, top: 918 }} onClick={props.onFinish}>
         Finish
