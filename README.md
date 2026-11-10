@@ -51,10 +51,10 @@ deployment, on the guest’s phone:
 /match?s=<session code>&c=<character id>&n=<first name>&t=<unix time>
 ```
 
-It shows their character, their name and a big 6-letter match code to show at the
-redemption counter. Broken links get a friendly “Match not found” message. The
-result lives in the link itself (no backend yet), so staff can check the code
-against the kiosk if needed.
+It shows the sign header and their character card (character, name, title and
+line) on one screen with no scrolling, sized to fit any phone. The guest shows it
+at the redemption counter. Broken links get a friendly “Match not found”. The
+result lives in the link itself (no backend yet).
 
 To host it somewhere else, set `VITE_QR_BASE_URL` in `.env.local` (see `.env.example`).
 
