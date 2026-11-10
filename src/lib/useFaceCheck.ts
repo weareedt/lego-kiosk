@@ -5,8 +5,8 @@ import { evaluateFaces, type FaceState } from './faceFrame';
 export type FaceCheck =
   | { mode: 'loading'; state: 'none' }
   | { mode: 'live'; state: FaceState }
-  /** Detector couldn't load (old device, blocked files): don't block the guest. */
-  | { mode: 'off'; state: 'ok' };
+  /** Detector couldn't load (old device, blocked files): don't block the guest, but don't claim a face either. */
+  | { mode: 'off'; state: 'none' };
 
 const INTERVAL = 150; // ms between checks
 const STABLE = 3; // consecutive results needed before the state changes
@@ -40,7 +40,10 @@ export function useFaceCheck(video: RefObject<HTMLVideoElement>, enabled: boolea
         };
         tick();
       })
-      .catch(() => alive && setCheck({ mode: 'off', state: 'ok' }));
+      .catch((err) => {
+        console.warn('[face-check] detector unavailable, camera works without it:', err);
+        if (alive) setCheck({ mode: 'off', state: 'none' });
+      });
 
     return () => {
       alive = false;

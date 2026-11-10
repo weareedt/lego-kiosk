@@ -34,8 +34,16 @@ export function Camera(props: { onShoot: (faceFound: boolean) => void; onBack: (
     return () => window.clearTimeout(t);
   }, [live, ok]);
 
-  const canShoot = ok || (live && anyway);
-  const hint = !live || face.mode === 'loading' ? (status === 'starting' || face.mode === 'loading' ? 'Starting camera…' : FACE_HINT.none) : face.state === 'ok' ? null : FACE_HINT[face.state];
+  // Without a detector the shutter is open, but the frame never claims "Perfect".
+  const noDetector = face.mode === 'off';
+  const canShoot = ok || (live && (anyway || noDetector));
+  const hint = !live || face.mode === 'loading'
+    ? 'Starting camera…'
+    : noDetector
+      ? 'Line up your face, then tap Take photo'
+      : face.state === 'ok'
+        ? null
+        : FACE_HINT[face.state];
 
   return (
     <div className="scr screen-camera">
@@ -77,7 +85,7 @@ export function Camera(props: { onShoot: (faceFound: boolean) => void; onBack: (
         className="pill"
         style={{ left: 162, right: 162, top: 880, opacity: canShoot ? 1 : 0.55 }}
         disabled={!canShoot}
-        onClick={() => props.onShoot(ok)}
+        onClick={() => props.onShoot(ok || noDetector)}
       >
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E3000B" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
