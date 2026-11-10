@@ -24,6 +24,8 @@ interface Session {
   passNo: string;
   name: string;
   photo: string | null;
+  /** Whether the face check saw a face when the photo was taken. */
+  faceFound: boolean;
   character: CharacterId | null;
   qr: string | null;
   /** The URL encoded in the QR (also exposed as data-href for staff/testing). */
@@ -35,6 +37,7 @@ const newSession = (): Session => ({
   passNo: String(1000 + Math.floor(Math.random() * 9000)),
   name: '',
   photo: null,
+  faceFound: false,
   character: null,
   qr: null,
   qrHref: null,
@@ -73,13 +76,13 @@ export function App() {
 
   const displayName = session.name.trim() || config.fallbackName;
 
-  const startMatching = (photo: string | null) => {
+  const startMatching = (photo: string | null, faceFound: boolean) => {
     cam.stop();
     setMatchDone(false);
     go('matching');
     // Lock the result at t = 0 so the reveal and QR are ready when the animation ends.
     const { id, name } = sessionRef.current;
-    matchGuest(photo).then(async (character) => {
+    matchGuest(photo, faceFound).then(async (character) => {
       const qrHref = resultUrl(id, character, name.trim());
       const qr = await qrDataUrl(qrHref);
       setSession((s) => (s.id === id ? { ...s, character, qr, qrHref } : s));
@@ -113,7 +116,16 @@ export function App() {
       );
       break;
     case 'camera':
-      view = <Camera onShoot={() => go('countdown')} onBack={() => go('name')} onError={() => go('cameraError')} />;
+      view = (
+        <Camera
+          onShoot={(faceFound) => {
+            setSession((s) => ({ ...s, faceFound }));
+            go('countdown');
+          }}
+          onBack={() => go('name')}
+          onError={() => go('cameraError')}
+        />
+      );
       break;
     case 'countdown':
       view = (
@@ -136,7 +148,7 @@ export function App() {
             setSession((s) => ({ ...s, photo: null }));
             go('camera');
           }}
-          onUse={() => startMatching(session.photo)}
+          onUse={() => startMatching(session.photo, session.faceFound)}
         />
       );
       break;
@@ -148,7 +160,7 @@ export function App() {
             cam.stop();
             go('camera');
           }}
-          onSkipPhoto={() => startMatching(null)}
+          onSkipPhoto={() => startMatching(null, false)}
           onStartOver={reset}
         />
       );

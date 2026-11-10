@@ -68,7 +68,9 @@ npm run test:all   # both
 
 First run of the end-to-end tests needs a browser: `npx playwright install chromium`.
 
-The end-to-end suite covers the full guest journey through to the auto reset, Retake,
+The end-to-end suite feeds Chromium a still of a guest (`tests/fixtures/face.y4m`)
+as the camera, so face detection runs for real. It covers face-in-frame (and the
+no-face hint and 10 s unlock), the full guest journey through to the auto reset, Retake,
 Skip, the keyboard (on-screen and laptop), the staff override, a blocked camera,
 the idle prompt (both outcomes), and the phone result page, including opening the
 kiosk’s QR link on a phone and getting the same character.
@@ -108,6 +110,9 @@ src/
     characters.ts      The 7 characters: copy, colours, images
     matching.ts        Photo read (simulated) + weighted pick + variety rules
     camera.tsx         Shared camera stream, mirrored preview, still capture
+    faceDetector.ts    Loads MediaPipe Face Detection (on-device, offline)
+    faceFrame.ts       Is the face inside the head outline? (+ hints)
+    useFaceCheck.ts    Runs the check on the live preview ~6×/second
     qr.ts              Session id + QR generation
     useIdle.ts         Inactivity / timeout hooks
   styles/
@@ -142,13 +147,32 @@ public/assets/         Background, welcome artwork, sign parts, lockup, LEGO log
 **Staff override (photo ops):** open the app with `?force=santa` (or any character
 id) and the next guest gets that character. It’s one-shot.
 
-Face-in-frame on the Camera screen is also simulated: it’s “ready” as soon as the
-stream is live. Drive the `ok` flag in `screens/Camera.tsx` from a face detector
-to make it real.
+## Face-in-frame check
+
+The Camera screen runs **MediaPipe Face Detection** (short-range model) on the live
+preview, entirely on the device. The runtime and model are copied from
+`node_modules` into `public/mediapipe` before every `dev`/`build`
+(`scripts/copy-mediapipe.mjs`), so it works without internet at the venue. Nothing
+is uploaded or stored.
+
+- **Take photo** unlocks only when a face sits inside the minifig-head outline at a
+  good distance. The frame turns green: “Perfect — hold that smile!”
+- Otherwise the chip gives a hint: *Move into the frame*, *Come a little closer*,
+  *Step back a little*, *Move a little to your left/right*, *Move up/down a little*.
+  Left/right accounts for the mirrored preview.
+- Groups are fine: one face in the outline is enough.
+- If no face is found for **10 s** (hats, costumes, little ones), Take photo unlocks
+  anyway, and that guest is matched from the “unsure” pool. If the detector can’t
+  load at all, the camera works as before and never blocks.
+- Tuning: outline geometry and size limits in `src/lib/faceFrame.ts`, the 10 s
+  fallback in `src/lib/config.ts`.
+
+Face *presence* is real. The masculine/feminine *read* used for matching is still
+simulated.
 
 ## Next steps
 
-- [ ] Real face-in-frame check and photo read (e.g. MediaPipe Face Detection, on-device)
+- [ ] On-device photo read for matching (currently simulated; face presence is real)
 - [ ] Backend for verified results (e.g. Firebase: save each match so staff can confirm codes)
 - [ ] Ask the client for the welcome artwork and background exported at 2× iPad size
       (1488 × 2266). The current files are 744 × 1133.

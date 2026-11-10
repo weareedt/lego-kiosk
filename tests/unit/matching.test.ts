@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTER_IDS, type CharacterId } from '../../src/lib/characters';
-import { POOLS, getStaffOverride, pickCharacter, setStaffOverride, type PhotoRead } from '../../src/lib/matching';
+import { POOLS, getStaffOverride, pickCharacter, readPhoto, setStaffOverride, type PhotoRead } from '../../src/lib/matching';
 
 const run = (read: PhotoRead, n: number) => {
   const counts: Partial<Record<CharacterId, number>> = {};
@@ -85,5 +85,12 @@ describe('staff override', () => {
   it('ignores an unknown override value', () => {
     localStorage.setItem('stf.staffOverride', 'grinch');
     expect(getStaffOverride()).toBeNull();
+  });
+});
+
+describe('photo read', () => {
+  it('no photo or no face found → the unsure pool', async () => {
+    expect(await readPhoto(null)).toBe('unsure');
+    expect(await readPhoto('data:image/jpeg;base64,x', false)).toBe('unsure');
   });
 });

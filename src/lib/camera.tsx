@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { config } from './config';
 
 export type CameraStatus = 'idle' | 'starting' | 'live' | 'denied' | 'unavailable';
@@ -90,14 +90,15 @@ export function useCamera() {
 }
 
 /** A mirrored live preview bound to the shared stream. */
-export function CameraPreview({ className }: { className?: string }) {
+export function CameraPreview({ className, videoRef }: { className?: string; videoRef?: RefObject<HTMLVideoElement> }) {
   const { stream } = useCamera();
-  const ref = useRef<HTMLVideoElement>(null);
+  const own = useRef<HTMLVideoElement>(null);
+  const ref = videoRef ?? own;
   useEffect(() => {
     if (ref.current && stream) {
       ref.current.srcObject = stream;
       ref.current.play().catch(() => undefined);
     }
-  }, [stream]);
+  }, [stream, ref]);
   return <video ref={ref} className={className} muted playsInline autoPlay style={{ transform: 'scaleX(-1)' }} />;
 }

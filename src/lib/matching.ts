@@ -24,9 +24,13 @@ export const POOLS: Record<PhotoRead, Weights> = {
   unsure: { elfboy: 10, santa: 10, elfgirl: 10, reindeer: 10, gingerbread: 20, snowman: 20, yeti: 20 },
 };
 
-/** SIMULATED read. Replace with a real on-device classifier when ready. */
-export async function readPhoto(photo: string | null): Promise<PhotoRead> {
-  if (!photo) return 'unsure';
+/**
+ * SIMULATED read. Face *presence* is real (from the camera's face check); the
+ * presentation estimate is still simulated. Replace with an on-device
+ * classifier when ready. No photo or no face found → 'unsure' pool.
+ */
+export async function readPhoto(photo: string | null, faceFound = true): Promise<PhotoRead> {
+  if (!photo || !faceFound) return 'unsure';
   const r = Math.random();
   if (r < 0.45) return 'masculine';
   if (r < 0.9) return 'feminine';
@@ -122,7 +126,7 @@ function record(id: CharacterId) {
 }
 
 /** Read + pick in one call. Resolved at the start of Matching so the reveal is ready. */
-export async function matchGuest(photo: string | null): Promise<CharacterId> {
-  const read = await readPhoto(photo);
+export async function matchGuest(photo: string | null, faceFound = true): Promise<CharacterId> {
+  const read = await readPhoto(photo, faceFound);
   return pickCharacter(read);
 }
