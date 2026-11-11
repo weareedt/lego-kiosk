@@ -24,8 +24,8 @@ Built with React + Vite + TypeScript. It runs in Safari as a full-screen web app
 
 “Still building?” waits 10 s, then starts over. A reset clears the name, photo and
 match, and stops the camera. If the camera is blocked or missing, the guest sees a
-camera error screen with **Match me anyway**, which matches from the neutral pool
-without a photo.
+camera error screen with **Match me anyway**, which gives them a match without a
+photo.
 
 All timings live in `src/lib/config.ts`.
 
@@ -56,14 +56,43 @@ name above (“ANNA, you’re the Elf Girl!”), a **Save my card** button, and 
 to show the screen at the counter to collect the Stamp Card. Everything fits one
 screen on any phone. *Save my card* opens the share sheet on phones (where “Save
 Image” puts it in Photos) and downloads the original JPEG elsewhere. Broken links
-get a friendly “Match not found”. The result lives in the link itself (no backend yet).
+get a friendly “Match not found”. The result lives in the link itself; opening it
+also counts a QR scan for the usage dashboard.
 
 To host it somewhere else, set `VITE_QR_BASE_URL` in `.env.local` (see `.env.example`).
+
+### Usage dashboard (`/stats`)
+
+Open **`/stats`** on the deployment (laptop or phone) for per-day usage across all
+iPads: guests, how far they got (name → camera → photo → matched → result → QR
+scan), guests by hour, cards handed out per character, camera problems, and a
+table of every day with a CSV download. It refreshes every minute. Days and hours
+are the iPad's local time; a QR scan counts on the day the guest played.
+
+How it works: the kiosk and the phone result page send small events to
+`/api/events` (`src/lib/telemetry.ts`). Each event is queued on the device and
+retried, so a kiosk that drops off the venue Wi-Fi catches up later, and the
+server ignores repeats, so nothing is double counted. Events only bump counters in
+Redis (`server/telemetry.ts`): no names or photos are stored.
+
+**One-time setup on Vercel:**
+
+1. In the Vercel project, open **Storage → Create / Connect Database → Upstash
+   (Redis)**, pick the free plan, and connect it to this project. That adds
+   `KV_REST_API_URL` and `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_*`) to the
+   environment.
+2. Optional: add a `STATS_KEY` environment variable. `/stats` then asks for it once
+   per browser. Without it, anyone with the link can see the (anonymous) totals.
+3. Redeploy.
+
+Until storage is connected, `/stats` says so and the kiosk keeps its events queued
+on the device. Locally, `npm run dev` and `npm run preview` serve the same API from
+memory (reset on restart), so the dashboard works without Redis.
 
 ## Tests
 
 ```bash
-npm test           # unit tests (Vitest): matching rules, QR links
+npm test           # unit tests (Vitest): matching rules, QR links, telemetry API
 npm run test:e2e   # end-to-end (Playwright, Chromium fake camera): builds and runs the app
 npm run test:all   # both
 ```
@@ -75,13 +104,15 @@ as the camera, so face detection runs for real. It covers face-in-frame (hints, 
 the no-face message on Confirm), the camera dropping out and Retake recovering, the full guest journey through to the auto reset, Retake,
 Skip, the keyboard (on-screen and laptop), the staff override, a blocked camera,
 the idle prompt (both outcomes), and the phone result page, including opening the
-kiosk’s QR link on a phone and getting the same character.
+kiosk’s QR link on a phone and getting the same character, and usage events
+reaching `/stats`.
 
 ## Deploying to Vercel
 
 Import the repo in Vercel. The framework preset is Vite (build `npm run build`,
-output `dist`). `vercel.json` rewrites every route to the app, and you set
-`VITE_QR_BASE_URL` in the project's environment variables.
+output `dist`). `vercel.json` rewrites every route except `/api/*` to the app. Functions in
+`api/` serve the usage stats (see *Usage dashboard* for the Redis setup).
+`VITE_QR_BASE_URL` is optional.
 
 ## iPad kiosk setup
 
@@ -107,16 +138,18 @@ src/
     IdlePrompt.tsx     “Still building?” overlay
   screens/             One file per screen (Welcome … StampCard, CameraError)
   result/              Phone result page opened from the QR (/match)
+  stats/               Staff usage dashboard (/stats)
   lib/
     config.ts          Timings, name length, QR base URL, camera settings
     characters.ts      The 7 characters: copy, colours, images
-    matching.ts        Photo read (simulated) + weighted pick + variety rules
+    matching.ts        Even-odds pick + variety rules + staff override
     camera.tsx         Shared camera stream, mirrored preview, still capture
     faceDetector.ts    Loads MediaPipe Face Detection (on-device, offline)
     faceFrame.ts       Is the face inside the head outline? (+ hints)
     useFaceCheck.ts    Runs the check on the live preview ~6×/second
     qr.ts              Session id + QR generation
     useIdle.ts         Inactivity / timeout hooks
+    telemetry.ts       Usage events, queued on the device and sent to /api/events
   styles/
     kiosk.css          Screen styles ported from the design canvas (scoped per screen)
     app.css            Resets, stage, idle prompt, runtime states
@@ -125,25 +158,17 @@ public/assets/         Background, welcome artwork, sign parts, lockup, LEGO log
 
 ## Character matching
 
-`src/lib/matching.ts` follows the UX spec:
+`src/lib/matching.ts`. The client printed the same number of cards for every
+character, so **every character is equally likely (1 in 7)**. The photo is not
+used for matching, and nothing identifying is stored.
 
-1. **Read.** A photo read returns `masculine`, `feminine` or `unsure`. This build
-   ships a **simulated** reader (`readPhoto`). Replace it with an on-device model
-   when ready. Nothing identifying is stored, and the read is never shown on
-   screen. Avoid the words “random”, “gender”, “male/female” and confidence scores
-   in the UI.
-2. **Weighted pick** (weights in %):
-
-   | Read | Elf Boy | Santa | Elf Girl | Reindeer | Gingerbread | Snowman | Yeti |
-   | --- | --- | --- | --- | --- | --- | --- | --- |
-   | Masculine | 30 | 25 | — | — | 15 | 15 | 15 |
-   | Feminine | — | — | 30 | 25 | 15 | 15 | 15 |
-   | Unsure / no photo | 10 | 10 | 10 | 10 | 20 | 20 | 20 |
-
-3. **Variety rules.** The same character never comes up twice in a row on one
-   kiosk. Any character above 25% of today’s results has its weight halved. Today’s
-   counts are stored in `localStorage`, per device.
-4. **Lock early.** The result is picked when Matching starts, so the reveal and the
+1. **Variety rules.** The same character never comes up twice in a row on one
+   kiosk. Once 7 or more guests have played today on that kiosk, any character more
+   than one ahead of its even share has its weight halved, so the counts stay close
+   together and no card runs out early. Today’s counts are stored in
+   `localStorage`, per device. The *Cards handed out* panel on `/stats` shows the
+   totals across all iPads.
+2. **Lock early.** The result is picked when Matching starts, so the reveal and the
    QR are ready when the animation ends.
 
 **Staff override (photo ops):** open the app with `?force=santa` (or any character
@@ -165,22 +190,20 @@ is uploaded or stored.
   just for fun. Groups are fine too.
 - After the shot, the still is checked for a face. If there isn’t one (guest
   stepped out, covered up, a dark frame), Confirm says “We couldn’t spot a face!”
-  with Retake as the main button and *Use it anyway* beside it. That guest is matched
-  from the “unsure” pool.
+  with Retake as the main button and *Use it anyway* beside it.
 - Blank or black frames are never saved. If the camera stalls or drops out, Retake
   restarts it automatically.
 - If the detector can’t load at all, the camera works as normal and the frame never
   claims “Perfect”.
 - Tuning: outline geometry and size limits in `src/lib/faceFrame.ts`.
 
-Face *presence* is real. The masculine/feminine *read* used for matching is still
-simulated.
+Face presence only drives the hints and the Confirm message; it doesn’t change the
+match.
 
 ## Next steps
 
-- [ ] On-device photo read for matching (currently simulated; face presence is real)
 - [ ] Backend for verified results (e.g. Firebase: save each match so staff can confirm codes)
 - [ ] Ask the client for the welcome artwork and background exported at 2× iPad size
       (1488 × 2266). The current files are 744 × 1133.
 - [ ] Optional: offline caching (service worker) for patchy venue Wi-Fi
-- [ ] Staff/admin screen for daily stats and the character override
+- [ ] Staff screen for the character override (daily stats are at `/stats`)

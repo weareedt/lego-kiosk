@@ -3,39 +3,17 @@ import { CHARACTER_IDS, type CharacterId } from './characters';
 /**
  * Character matching.
  *
- * 1. Read: a photo "read" returns a presentation estimate. This build ships a
- *    SIMULATED reader; swap `readPhoto` for an on-device model later. Nothing
- *    identifying is stored, and the read is never shown on screen.
- * 2. Weighted pick from the pool for that read. The neutral characters
- *    (Gingerbread, Snowman, Yeti) sit in every pool, so an unexpected match
- *    still feels festive.
- * 3. Variety rules: never the same character twice in a row on this kiosk, and
- *    any character above 25% of today's results has its weight halved.
- * 4. A staff override (see `setStaffOverride`) forces the next result.
+ * The client printed the same number of cards for every character, so every
+ * character is equally likely: 1 in 7. Two variety rules keep stock even:
+ *
+ * 1. Never the same character twice in a row on this kiosk.
+ * 2. Once 7 or more guests have played today on this kiosk, any character more
+ *    than one ahead of its even share has its weight halved, so the counts
+ *    stay close together through the day.
+ *
+ * A staff override (see `setStaffOverride`) forces the next result. The photo
+ * is not used for matching, and nothing identifying is stored.
  */
-
-export type PhotoRead = 'masculine' | 'feminine' | 'unsure';
-
-type Weights = Partial<Record<CharacterId, number>>;
-
-export const POOLS: Record<PhotoRead, Weights> = {
-  masculine: { elfboy: 30, santa: 25, gingerbread: 15, snowman: 15, yeti: 15 },
-  feminine: { elfgirl: 30, reindeer: 25, gingerbread: 15, snowman: 15, yeti: 15 },
-  unsure: { elfboy: 10, santa: 10, elfgirl: 10, reindeer: 10, gingerbread: 20, snowman: 20, yeti: 20 },
-};
-
-/**
- * SIMULATED read. Face *presence* is real (from the camera's face check); the
- * presentation estimate is still simulated. Replace with an on-device
- * classifier when ready. No photo or no face found → 'unsure' pool.
- */
-export async function readPhoto(photo: string | null, faceFound = true): Promise<PhotoRead> {
-  if (!photo || !faceFound) return 'unsure';
-  const r = Math.random();
-  if (r < 0.45) return 'masculine';
-  if (r < 0.9) return 'feminine';
-  return 'unsure';
-}
 
 // ---- Persistence for variety rules (per kiosk, per day) -------------------
 
@@ -85,7 +63,7 @@ export function getStaffOverride(): CharacterId | null {
   return v && CHARACTER_IDS.includes(v) ? v : null;
 }
 
-export function pickCharacter(read: PhotoRead, rand: () => number = Math.random): CharacterId {
+export function pickCharacter(rand: () => number = Math.random): CharacterId {
   const forced = getStaffOverride();
   if (forced) {
     setStaffOverride(null); // one-shot
@@ -97,12 +75,11 @@ export function pickCharacter(read: PhotoRead, rand: () => number = Math.random)
   const total = Object.values(stats.counts).reduce((a, b) => a + (b ?? 0), 0);
   const last = safeGet(LAST_KEY) as CharacterId | null;
 
-  const entries = (Object.entries(POOLS[read]) as [CharacterId, number][])
-    .filter(([id]) => id !== last)
-    .map(([id, w]) => {
-      const share = total >= 8 ? (stats.counts[id] ?? 0) / total : 0;
-      return [id, share > 0.25 ? w / 2 : w] as const;
-    });
+  const evenShare = total / CHARACTER_IDS.length;
+  const entries = CHARACTER_IDS.filter((id) => id !== last).map((id) => {
+    const ahead = total >= CHARACTER_IDS.length && (stats.counts[id] ?? 0) > evenShare + 1;
+    return [id, ahead ? 0.5 : 1] as const;
+  });
 
   const sum = entries.reduce((a, [, w]) => a + w, 0);
   let roll = rand() * sum;
@@ -125,8 +102,7 @@ function record(id: CharacterId) {
   safeSet(LAST_KEY, id);
 }
 
-/** Read + pick in one call. Resolved at the start of Matching so the reveal is ready. */
-export async function matchGuest(photo: string | null, faceFound = true): Promise<CharacterId> {
-  const read = await readPhoto(photo, faceFound);
-  return pickCharacter(read);
+/** Picks the guest's character. Resolved at the start of Matching so the reveal is ready. */
+export async function matchGuest(): Promise<CharacterId> {
+  return pickCharacter();
 }

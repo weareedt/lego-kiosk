@@ -7,6 +7,7 @@ import { config } from './lib/config';
 import { photoHasFace } from './lib/faceDetector';
 import { matchGuest } from './lib/matching';
 import { newSessionId, qrDataUrl, resultUrl } from './lib/qr';
+import { track, type EventType } from './lib/telemetry';
 import { useIdle } from './lib/useIdle';
 import { Camera } from './screens/Camera';
 import { CameraError } from './screens/CameraError';
@@ -44,6 +45,16 @@ const newSession = (): Session => ({
 });
 
 /** Inactivity before the "Still building?" prompt, for screens that have one. */
+/** Usage event sent the first time a session reaches each screen (for /stats). */
+const SCREEN_EVENT: Partial<Record<Screen, EventType>> = {
+  name: 'start',
+  camera: 'camera',
+  confirm: 'confirm',
+  cameraError: 'cameraError',
+  matching: 'matching',
+  reveal: 'reveal',
+};
+
 const IDLE_PROMPT: Partial<Record<Screen, number>> = {
   name: config.idle.name,
   camera: config.idle.camera,
@@ -76,18 +87,28 @@ export function App() {
 
   const displayName = session.name.trim() || config.fallbackName;
 
-  const startMatching = (photo: string | null, faceFound: boolean) => {
+  const startMatching = () => {
     cam.stop();
     setMatchDone(false);
     go('matching');
     // Lock the result at t = 0 so the reveal and QR are ready when the animation ends.
     const { id, name } = sessionRef.current;
-    matchGuest(photo, faceFound).then(async (character) => {
+    matchGuest().then(async (character) => {
       const qrHref = resultUrl(id, character, name.trim());
       const qr = await qrDataUrl(qrHref);
       setSession((s) => (s.id === id ? { ...s, character, qr, qrHref } : s));
     });
   };
+
+  // Usage telemetry: one event per session per step (retakes and repeats don't recount).
+  const tracked = useRef(new Set<string>());
+  useEffect(() => {
+    const type = SCREEN_EVENT[screen];
+    const key = `${session.id}:${type}`;
+    if (!type || tracked.current.has(key)) return;
+    tracked.current.add(key);
+    track(type, session.id, type === 'reveal' && session.character ? { character: session.character } : {});
+  }, [screen, session.id, session.character]);
 
   // Leave Matching once both the animation has finished and the result is ready.
   useEffect(() => {
@@ -159,7 +180,7 @@ export function App() {
             setSession((s) => ({ ...s, photo: null, faceFound: null }));
             go('camera');
           }}
-          onUse={() => startMatching(session.photo, session.faceFound !== false)}
+          onUse={startMatching}
         />
       );
       break;
@@ -171,7 +192,7 @@ export function App() {
             cam.stop();
             go('camera');
           }}
-          onSkipPhoto={() => startMatching(null, false)}
+          onSkipPhoto={startMatching}
           onStartOver={reset}
         />
       );

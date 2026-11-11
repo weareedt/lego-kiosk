@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CHARACTERS, type Character } from '../lib/characters';
 import { parseResult } from '../lib/qr';
+import { track } from '../lib/telemetry';
 import './result.css';
 
 /**
@@ -12,6 +13,13 @@ import './result.css';
 export function ResultPage({ search = window.location.search }: { search?: string }) {
   const r = parseResult(search);
   const c = r ? CHARACTERS[r.character] : null;
+
+  // Count the scan against the day the guest played (the QR's timestamp), once per session.
+  const sessionId = r?.sessionId;
+  const playedAt = r?.at?.getTime();
+  useEffect(() => {
+    if (sessionId) track('qr', sessionId, playedAt ? { at: new Date(playedAt) } : {});
+  }, [sessionId, playedAt]);
 
   if (!r || !c) {
     return (
