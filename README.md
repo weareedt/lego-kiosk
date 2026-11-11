@@ -9,7 +9,7 @@ Built with React + Vite + TypeScript. It runs in Safari as a full-screen web app
 ## Flow
 
 ```
-01 Welcome → 02 Name → 03 Camera → 03b 3-2-1 → 04 Confirm → 05 Matching → 06 Reveal + QR → 07 Collect Stamp Card → reset
+01 Welcome → 02 Name → 03 Camera → 03b 3-2-1 → 04 Confirm → 05 Matching → 06 Reveal + collect Stamp Card (QR) → reset
 ```
 
 | Screen | Moves on | Timeout |
@@ -20,8 +20,7 @@ Built with React + Vite + TypeScript. It runs in Safari as a full-screen web app
 | 03b Countdown | Automatic (3 s), captures a still | — |
 | 04 Confirm | Use this photo / Retake | 20 s → “Still building?” |
 | 05 Matching | Automatic (4.5 s), not interruptible | — |
-| 06 Reveal + QR | Done | 60 s → Stamp Card |
-| 07 Stamp Card | Finish | 20 s → reset |
+| 06 Reveal + collect | No guest button: scan the QR, show it at the counter | 45 s → reset (staff can tap Finish) |
 
 “Still building?” waits 10 s, then starts over. A reset clears the name, photo and
 match, and stops the camera. If the camera is blocked or missing, the guest sees a
@@ -44,7 +43,7 @@ during development, deploy a preview (Vercel) or use an HTTPS tunnel.
 
 ### Phone result page (QR)
 
-The QR on the Reveal and Stamp Card screens opens **`/match`** on the same
+The QR on the final screen opens **`/match`** on the same
 deployment, on the guest’s phone:
 
 ```

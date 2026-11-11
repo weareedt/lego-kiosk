@@ -45,22 +45,33 @@ test('full guest journey: welcome to reveal to stamp card to auto reset', async 
   await expect(page.locator('.screen-reveal .pre')).toContainText('ANNA, your LEGO festive match is');
   const characterName = (await page.locator('.screen-reveal .np h1').textContent())!.trim();
   expect(characterName.length).toBeGreaterThan(0);
-  const qr = page.locator('.screen-reveal .qr img');
+  const qr = page.locator('.screen-reveal .collect-qr img');
   await expect(qr).toHaveAttribute('src', /^data:image\/png/);
   const href = await qr.getAttribute('data-href');
   expect(href).toMatch(/\/match\?s=[A-Z0-9]{6}&c=[a-z]+&n=ANNA&t=\d+$/);
 
-  await page.locator('.screen-reveal .pill2').click();
-  await expect(page.locator('.screen-stampcard')).toBeVisible();
-  await expect(page.locator('.screen-stampcard .panel')).toContainText('Head to the counter, ANNA');
-  await expect(page.locator('.screen-stampcard .tag-head')).toContainText(characterName.toUpperCase());
+  // One final screen: the next step is clear and there's no guest "Done" to walk away on
+  const collect = page.locator('.screen-reveal .collect');
+  await expect(collect).toContainText('COLLECT YOUR STAMP CARD');
+  await expect(collect).toContainText('Scan to save your match card');
+  await expect(collect).toContainText('Show it at the counter to get your Stamp Card');
+  await expect(page.locator('.screen-reveal').getByRole('button', { name: /done/i })).toHaveCount(0);
+  await expect(page.locator('.screen-reveal .rst')).toContainText('Starting over for the next elf');
 
-  // Auto reset after 20 s, everything cleared
-  await expect(page.locator('.screen-welcome')).toBeVisible({ timeout: 23_000 });
+  // Auto reset after 45 s, everything cleared
+  await expect(page.locator('.screen-welcome')).toBeVisible({ timeout: 50_000 });
   await page.locator('.screen-welcome').click();
   await expect(page.locator('.screen-name .field')).toContainText('0 / 12');
 
   expect(errors).toEqual([]);
+});
+
+test('staff Finish resets the final screen straight away', async ({ page }) => {
+  await toConfirm(page);
+  await page.locator('.screen-confirm .pill').click();
+  await expect(page.locator('.screen-reveal')).toBeVisible({ timeout: 8_000 });
+  await page.getByRole('button', { name: 'Finish (staff)' }).click();
+  await expect(page.locator('.screen-welcome')).toBeVisible();
 });
 
 test('retake goes back to the live camera', async ({ page }) => {
@@ -115,7 +126,7 @@ test('skip uses "Festive Friend" and the QR leaves the name out', async ({ page 
   await page.locator('.screen-camera .pill').click();
   await page.locator('.screen-confirm .pill').click({ timeout: 8_000 });
   await expect(page.locator('.screen-reveal .pre')).toContainText('Festive Friend', { timeout: 8_000 });
-  expect(await page.locator('.screen-reveal .qr img').getAttribute('data-href')).not.toContain('&n=');
+  expect(await page.locator('.screen-reveal .collect-qr img').getAttribute('data-href')).not.toContain('&n=');
 });
 
 test('Continue is disabled until a name is typed; back returns to welcome', async ({ page }) => {

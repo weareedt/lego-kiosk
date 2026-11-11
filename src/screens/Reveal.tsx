@@ -1,7 +1,7 @@
 import { Chrome } from '../components/Chrome';
 import type { Character } from '../lib/characters';
 import { config } from '../lib/config';
-import { useIdle } from '../lib/useIdle';
+import { useTimeout } from '../lib/useIdle';
 
 const CONFETTI = [
   { left: 40, bg: '#E3000B', dur: 5, delay: 0 },
@@ -14,10 +14,16 @@ const CONFETTI = [
   { left: 700, bg: '#0B6FD6', dur: 5.9, delay: 0.8 },
 ];
 
-/** 06 · Character reveal + QR. Moves on to the Stamp Card screen on Done or after idle. */
-export function Reveal(props: { name: string; character: Character; qr: string | null; qrHref?: string | null; onDone: () => void }) {
+/**
+ * 06 · Reveal + collect (the final screen; Reveal and Stamp Card combined).
+ * The character reveal, then one clear next step: scan the QR to save the
+ * card, and show it at the counter for the Stamp Card. There is no guest
+ * "Done" button to walk away on: the screen stays up, then resets itself.
+ * Staff can tap the small Finish button to reset early.
+ */
+export function Reveal(props: { name: string; character: Character; qr: string | null; qrHref?: string | null; onFinish: () => void }) {
   const c = props.character;
-  useIdle(config.idle.reveal, props.onDone);
+  useTimeout(config.idle.final, props.onFinish);
   return (
     <div className="scr screen-reveal">
       <Chrome tab="STEP 4 OF 4">
@@ -32,25 +38,51 @@ export function Reveal(props: { name: string; character: Character; qr: string |
       <div className="rays" />
       <img className="char" src={c.image} alt={c.name} />
       <div className="np">
-        <h1 className="d ext" style={{ fontSize: 52 }}>{c.name}</h1>
+        <h1 className="d ext" style={{ fontSize: 50 }}>{c.name}</h1>
         <span className="title" style={{ background: c.deep }}>{c.title}</span>
-        <p style={{ margin: '10px 0 0', fontSize: 17, lineHeight: 1.35, fontWeight: 700, color: '#3A2A00' }}>{c.quote}</p>
+        <p style={{ margin: '8px 0 0', fontSize: 16, lineHeight: 1.3, fontWeight: 700, color: '#3A2A00' }}>{c.quote}</p>
       </div>
-      <div className="qr">
-        {props.qr && <img src={props.qr} data-href={props.qrHref ?? undefined} alt="QR code to see your match on your phone" />}
-        <div>
-          <p className="d" style={{ fontSize: 24, lineHeight: 1 }}>
-            Scan to see
-            <br />
-            your match
-          </p>
-          <p style={{ margin: '6px 0 0', fontSize: 14, fontWeight: 700, color: '#4A4135', lineHeight: 1.3 }}>
-            Open it on your phone, then show it at the counter
-          </p>
+
+      <section className="collect" aria-label="Collect your Stamp Card">
+        <div className="collect-head">COLLECT YOUR STAMP CARD</div>
+        <div className="collect-body">
+          <div className="collect-qr">{props.qr && <img src={props.qr} data-href={props.qrHref ?? undefined} alt="QR code to save your match card" />}</div>
+          <ol className="collect-steps">
+            <li>
+              <b>1</b>
+              <span>
+                <strong>Scan</strong> to save your match card
+              </span>
+            </li>
+            <li>
+              <b>2</b>
+              <span>
+                <strong>Show it at the counter</strong> to get your Stamp Card
+              </span>
+            </li>
+          </ol>
         </div>
+      </section>
+
+      <div className="rst">
+        <svg width="32" height="32" viewBox="0 0 34 34" aria-hidden="true">
+          <circle cx="17" cy="17" r="14" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="5" />
+          <circle
+            className="ring"
+            cx="17"
+            cy="17"
+            r="14"
+            fill="none"
+            stroke="#FFD500"
+            strokeWidth="5"
+            transform="rotate(-90 17 17)"
+            style={{ animationDuration: `${config.idle.final / 1000}s` }}
+          />
+        </svg>
+        Starting over for the next elf…
       </div>
-      <button type="button" className="pill2" style={{ left: 96, right: 96, top: 1002 }} onClick={props.onDone}>
-        Done
+      <button type="button" className="staff-finish" onClick={props.onFinish} aria-label="Finish (staff)">
+        Finish
       </button>
     </div>
   );

@@ -70,7 +70,7 @@ test('QR from the kiosk opens the same character card on the phone', async ({ br
   await kiosk.locator('.screen-confirm .pill').click({ timeout: 8_000 });
   await expect(kiosk.locator('.screen-reveal')).toBeVisible({ timeout: 8_000 });
   const name = (await kiosk.locator('.screen-reveal .np h1').textContent())!.trim();
-  const href = (await kiosk.locator('.screen-reveal .qr img').getAttribute('data-href'))!;
+  const href = (await kiosk.locator('.screen-reveal .collect-qr img').getAttribute('data-href'))!;
   await kioskCtx.close();
 
   const phoneCtx = await browser.newContext({ ...devices['iPhone 13'] });

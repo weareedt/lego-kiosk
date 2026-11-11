@@ -14,10 +14,8 @@ export const config = {
     confirm: 20_000,
     /** How long the prompt waits for a tap before starting over. */
     promptCountdown: 10_000,
-    /** Reveal moves on to the Stamp Card screen after this long without a tap. */
-    reveal: 60_000,
-    /** Stamp Card screen resets for the next guest after this long (time to scan the QR). */
-    stampCard: 20_000,
+    /** The final Reveal + collect screen stays up this long (time to scan the QR), then resets. */
+    final: 45_000,
   },
 
   countdownSeconds: 3,

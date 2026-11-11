@@ -15,10 +15,9 @@ import { Countdown } from './screens/Countdown';
 import { Matching } from './screens/Matching';
 import { Name } from './screens/Name';
 import { Reveal } from './screens/Reveal';
-import { StampCard } from './screens/StampCard';
 import { Welcome } from './screens/Welcome';
 
-export type Screen = 'welcome' | 'name' | 'camera' | 'countdown' | 'confirm' | 'cameraError' | 'matching' | 'reveal' | 'stampcard';
+export type Screen = 'welcome' | 'name' | 'camera' | 'countdown' | 'confirm' | 'cameraError' | 'matching' | 'reveal';
 
 interface Session {
   id: string;
@@ -181,10 +180,7 @@ export function App() {
       view = <Matching onDone={() => setMatchDone(true)} />;
       break;
     case 'reveal':
-      view = character ? <Reveal name={displayName} character={character} qr={session.qr} qrHref={session.qrHref} onDone={() => go('stampcard')} /> : <></>;
-      break;
-    case 'stampcard':
-      view = character ? <StampCard name={displayName} character={character} qr={session.qr} onFinish={reset} /> : <></>;
+      view = character ? <Reveal name={displayName} character={character} qr={session.qr} qrHref={session.qrHref} onFinish={reset} /> : <></>;
       break;
   }
 

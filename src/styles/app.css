@@ -36,9 +36,6 @@ button:disabled { cursor: default; }
 @keyframes flashOnce { 0% { opacity: 1; } 100% { opacity: 0; } }
 .screen-countdown .lt { transition: background .15s, color .15s; }
 
-/* Stamp Card tag text */
-.screen-stampcard .tag-head { align-self: stretch; background: #E3000B; color: #fff; text-align: center; font-family: Rubik, sans-serif; font-weight: 900; font-size: 14px; letter-spacing: 1.5px; padding: 9px 0; }
-.screen-stampcard .tag-foot { font-family: Rubik, sans-serif; font-weight: 800; font-size: 13px; letter-spacing: 1.5px; margin-bottom: 14px; color: #4A4135; }
 
 /* Welcome is a full-screen button */
 .screen-welcome.scr { padding: 0; }
@@ -64,3 +61,20 @@ button:disabled { cursor: default; }
 .screen-confirm .noface span { font-size: 16px; font-weight: 700; }
 .screen-confirm .retake-main { font-size: 26px; gap: 10px; }
 .screen-confirm .use-anyway { font-size: 22px; }
+
+/* Reveal + collect (final screen) */
+.screen-reveal .collect { position: absolute; left: 44px; right: 44px; top: 800px; background: #fff; border-radius: 26px; overflow: hidden; box-shadow: 0 0 0 6px #FFD500, 0 16px 30px rgba(40,20,0,.35); z-index: 3; animation: collectIn .5s cubic-bezier(.2,1.3,.4,1) 1.4s both; }
+@keyframes collectIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+.screen-reveal .collect-head { background: #E3000B; color: #fff; text-align: center; font-family: "Rubik", sans-serif; font-weight: 900; font-size: 18px; letter-spacing: 2px; padding: 10px 0; }
+.screen-reveal .collect-body { display: flex; align-items: center; gap: 22px; padding: 16px 22px; }
+.screen-reveal .collect-qr { flex: none; width: 170px; height: 170px; border-radius: 12px; box-shadow: 0 0 0 3px #171717; overflow: hidden; animation: qrPulse 2.4s ease-in-out 2.4s infinite; }
+@keyframes qrPulse { 0%, 70%, 100% { box-shadow: 0 0 0 3px #171717; } 80% { box-shadow: 0 0 0 3px #171717, 0 0 0 12px rgba(255,213,0,.75); } }
+.screen-reveal .collect-qr img { display: block; width: 100%; height: 100%; }
+.screen-reveal .collect-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.screen-reveal .collect-steps li { display: flex; align-items: center; gap: 14px; font-size: 21px; line-height: 1.25; font-weight: 700; color: #3A3328; }
+.screen-reveal .collect-steps b { flex: none; width: 42px; height: 42px; border-radius: 50%; background: #E3000B; color: #fff; display: flex; align-items: center; justify-content: center; font-family: "Rubik", sans-serif; font-weight: 900; font-size: 22px; box-shadow: inset 0 -4px 0 #9E0008; }
+.screen-reveal .collect-steps strong { font-family: "Rubik", sans-serif; font-weight: 900; text-transform: uppercase; color: #171717; }
+.screen-reveal .rst { position: absolute; left: 0; right: 0; top: 1062px; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; font-weight: 700; font-size: 17px; text-shadow: 0 2px 6px rgba(0,0,0,.65); }
+.screen-reveal .ring { stroke-dasharray: 88; animation: drainOnce linear 1 both; }
+@keyframes drainOnce { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 88; } }
+.screen-reveal .staff-finish { position: absolute; right: 24px; bottom: 24px; height: 44px; padding: 0 18px; border-radius: 999px; background: rgba(255,255,255,.55); color: #3A3328; font-family: "Rubik", sans-serif; font-weight: 800; font-size: 15px; letter-spacing: 1px; text-transform: uppercase; }
