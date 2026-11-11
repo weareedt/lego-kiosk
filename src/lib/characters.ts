@@ -10,6 +10,8 @@ export interface Character {
   /** Accent used for the title pill. */
   deep: string;
   image: string;
+  /** The client's finished match card (1080×1350), shown and downloaded on the phone result page. */
+  card: string;
 }
 
 export const CHARACTERS: Record<CharacterId, Character> = {
@@ -21,6 +23,7 @@ export const CHARACTERS: Record<CharacterId, Character> = {
     color: '#2BB24C',
     deep: '#0B6B3A',
     image: '/assets/characters/elfboy.png',
+    card: '/assets/cards/elfboy.jpg',
   },
   elfgirl: {
     id: 'elfgirl',
@@ -30,6 +33,7 @@ export const CHARACTERS: Record<CharacterId, Character> = {
     color: '#FF4B4B',
     deep: '#0B6B3A',
     image: '/assets/characters/elfgirl.png',
+    card: '/assets/cards/elfgirl.jpg',
   },
   santa: {
     id: 'santa',
@@ -39,6 +43,7 @@ export const CHARACTERS: Record<CharacterId, Character> = {
     color: '#FFFFFF',
     deep: '#E3000B',
     image: '/assets/characters/santa.png',
+    card: '/assets/cards/santa.jpg',
   },
   reindeer: {
     id: 'reindeer',
@@ -48,6 +53,7 @@ export const CHARACTERS: Record<CharacterId, Character> = {
     color: '#FFB347',
     deep: '#6B3A1E',
     image: '/assets/characters/reindeer.png',
+    card: '/assets/cards/reindeer.jpg',
   },
   gingerbread: {
     id: 'gingerbread',
@@ -57,6 +63,7 @@ export const CHARACTERS: Record<CharacterId, Character> = {
     color: '#FFD9A0',
     deep: '#7A3E17',
     image: '/assets/characters/gingerbread.png',
+    card: '/assets/cards/gingerbread.jpg',
   },
   snowman: {
     id: 'snowman',
@@ -66,6 +73,7 @@ export const CHARACTERS: Record<CharacterId, Character> = {
     color: '#BFE6FF',
     deep: '#E3000B',
     image: '/assets/characters/snowman.png',
+    card: '/assets/cards/snowman.jpg',
   },
   yeti: {
     id: 'yeti',
@@ -75,6 +83,7 @@ export const CHARACTERS: Record<CharacterId, Character> = {
     color: '#9FD3FF',
     deep: '#0B4FA8',
     image: '/assets/characters/yeti.png',
+    card: '/assets/cards/yeti.jpg',
   },
 };
 

@@ -51,10 +51,13 @@ deployment, on the guest’s phone:
 /match?s=<session code>&c=<character id>&n=<first name>&t=<unix time>
 ```
 
-It shows the sign header and their character card (character, name, title and
-line) on one screen with no scrolling, sized to fit any phone. The guest shows it
-at the redemption counter. Broken links get a friendly “Match not found”. The
-result lives in the link itself (no backend yet).
+It shows the client’s finished match card for their character
+(`public/assets/cards/<id>.jpg`, 1080×1350, shown untouched) in a frame, with their
+name above (“ANNA, you’re the Elf Girl!”), a **Save my card** button, and a reminder
+to show the screen at the counter to collect the Stamp Card. Everything fits one
+screen on any phone. *Save my card* opens the share sheet on phones (where “Save
+Image” puts it in Photos) and downloads the original JPEG elsewhere. Broken links
+get a friendly “Match not found”. The result lives in the link itself (no backend yet).
 
 To host it somewhere else, set `VITE_QR_BASE_URL` in `.env.local` (see `.env.example`).
 
