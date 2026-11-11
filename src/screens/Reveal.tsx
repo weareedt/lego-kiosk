@@ -38,9 +38,7 @@ export function Reveal(props: { name: string; character: Character; qr: string |
       <div className="rays" />
       <img className="char" src={c.image} alt={c.name} />
       <div className="np">
-        <h1 className="d ext" style={{ fontSize: 50 }}>{c.name}</h1>
-        <span className="title" style={{ background: c.deep }}>{c.title}</span>
-        <p style={{ margin: '8px 0 0', fontSize: 16, lineHeight: 1.3, fontWeight: 700, color: '#3A2A00' }}>{c.quote}</p>
+        <h1 className="d ext" style={{ fontSize: 60 }}>{c.name}</h1>
       </div>
 
       <section className="collect" aria-label="Collect your Stamp Card">
