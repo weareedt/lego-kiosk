@@ -95,7 +95,8 @@ export async function syncUsage(): Promise<void> {
   let raw: string;
   try {
     raw = localStorage.getItem(KEY) ?? '{}';
-    if (raw === localStorage.getItem(SYNCED_KEY)) return;
+    // Nothing counted yet (e.g. a laptop that just opened the kiosk): don't register as an iPad.
+    if (raw === '{}' || raw === localStorage.getItem(SYNCED_KEY)) return;
   } catch {
     return;
   }

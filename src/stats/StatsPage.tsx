@@ -121,7 +121,11 @@ export function StatsPage() {
   }, [refresh]);
 
   const days = useMemo(() => combine(online.state === 'ok' ? online.kiosks : {}, self, local), [online, self, local]);
-  const others = online.state === 'ok' ? Object.entries(online.kiosks).filter(([id]) => !(id === self && local.length)) : [];
+  // iPads that have counted at least one guest (empty uploads from stray browsers don't count).
+  const others =
+    online.state === 'ok'
+      ? Object.entries(online.kiosks).filter(([id, s]) => !(id === self && local.length) && Object.keys(s.days).length > 0)
+      : [];
   const latest = others.map(([, s]) => s.at).sort().pop();
 
   let source: string;
