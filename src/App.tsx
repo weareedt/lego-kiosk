@@ -4,6 +4,7 @@ import { Stage } from './components/Stage';
 import { useCamera } from './lib/camera';
 import { CHARACTERS, type CharacterId } from './lib/characters';
 import { config } from './lib/config';
+import { photoHasFace } from './lib/faceDetector';
 import { matchGuest } from './lib/matching';
 import { newSessionId, qrDataUrl, resultUrl } from './lib/qr';
 import { useIdle } from './lib/useIdle';
@@ -24,8 +25,8 @@ interface Session {
   passNo: string;
   name: string;
   photo: string | null;
-  /** Whether the face check saw a face when the photo was taken. */
-  faceFound: boolean;
+  /** Whether a face was found in the captured photo (null = still checking / unknown). */
+  faceFound: boolean | null;
   character: CharacterId | null;
   qr: string | null;
   /** The URL encoded in the QR (also exposed as data-href for staff/testing). */
@@ -37,7 +38,7 @@ const newSession = (): Session => ({
   passNo: String(1000 + Math.floor(Math.random() * 9000)),
   name: '',
   photo: null,
-  faceFound: false,
+  faceFound: null,
   character: null,
   qr: null,
   qrHref: null,
@@ -118,10 +119,7 @@ export function App() {
     case 'camera':
       view = (
         <Camera
-          onShoot={(faceFound) => {
-            setSession((s) => ({ ...s, faceFound }));
-            go('countdown');
-          }}
+          onShoot={() => go('countdown')}
           onBack={() => go('name')}
           onError={() => go('cameraError')}
         />
@@ -130,10 +128,21 @@ export function App() {
     case 'countdown':
       view = (
         <Countdown
-          onCapture={() => {
-            const photo = cam.capture();
-            setSession((s) => ({ ...s, photo }));
+          onCapture={async () => {
+            // The flash is on screen now; grab a frame (retrying briefly if the camera hiccups).
+            let photo: string | null = null;
+            for (let i = 0; i < 6 && !photo; i++) {
+              photo = cam.capture();
+              if (!photo) await new Promise((r) => window.setTimeout(r, 120));
+            }
+            const id = sessionRef.current.id;
+            setSession((s) => ({ ...s, photo, faceFound: photo ? null : false }));
             window.setTimeout(() => go('confirm'), 450);
+            // Check the still for a face; Confirm shows a friendly note if there isn't one.
+            if (photo) {
+              const found = await photoHasFace(photo);
+              setSession((s) => (s.id === id && s.photo === photo ? { ...s, faceFound: found } : s));
+            }
           }}
         />
       );
@@ -144,11 +153,14 @@ export function App() {
           name={displayName}
           photo={session.photo}
           passNo={session.passNo}
+          faceFound={session.faceFound}
           onRetake={() => {
-            setSession((s) => ({ ...s, photo: null }));
+            // If the last shot came out blank, the stream is stuck: get a fresh one.
+            if (!session.photo) cam.stop();
+            setSession((s) => ({ ...s, photo: null, faceFound: null }));
             go('camera');
           }}
-          onUse={() => startMatching(session.photo, session.faceFound)}
+          onUse={() => startMatching(session.photo, session.faceFound !== false)}
         />
       );
       break;

@@ -31,8 +31,10 @@ test('full guest journey: welcome to reveal to stamp card to auto reset', async 
   const errors = watchErrors(page);
   await toConfirm(page);
 
-  // Factory Pass shows the captured photo and name
+  // Factory Pass shows the captured photo and name, and a face was found in it
   await expect(page.locator('.screen-confirm .ph img')).toHaveAttribute('src', /^data:image\/jpeg/);
+  await expect(page.locator('.screen-confirm')).toHaveAttribute('data-face-found', 'true', { timeout: 10_000 });
+  await expect(page.locator('.screen-confirm .noface')).toHaveCount(0);
   await expect(page.locator('.screen-confirm .pass')).toContainText('ANNA');
 
   await page.locator('.screen-confirm .pill').click();
@@ -63,8 +65,46 @@ test('full guest journey: welcome to reveal to stamp card to auto reset', async 
 
 test('retake goes back to the live camera', async ({ page }) => {
   await toConfirm(page);
-  await page.locator('.screen-confirm .pill2').click();
+  await page.locator('.screen-confirm').getByRole('button', { name: 'Retake' }).click();
   await expect(page.locator('.screen-camera .pill')).toBeEnabled();
+  await expect(page.locator('.screen-camera .win')).toHaveAttribute('data-face', 'ok', { timeout: 10_000 });
+});
+
+test('if the camera stream dies, Retake restarts it and the next photo works', async ({ page }) => {
+  await toConfirm(page);
+  // Simulate the camera dropping out (another app grabs it, iOS suspends it…)
+  await page.evaluate(() => {
+    const v = document.querySelector('video') as HTMLVideoElement | null;
+    (v?.srcObject as MediaStream | null)?.getTracks().forEach((t) => t.stop());
+  });
+  await page.locator('.screen-confirm').getByRole('button', { name: 'Retake' }).click();
+  await expect(page.locator('.screen-camera .win')).toHaveAttribute('data-face', 'ok', { timeout: 15_000 });
+  const live = await page.evaluate(() =>
+    ((document.querySelector('.screen-camera video') as HTMLVideoElement).srcObject as MediaStream).getVideoTracks()[0].readyState,
+  );
+  expect(live).toBe('live');
+  await page.locator('.screen-camera .pill').click();
+  await expect(page.locator('.screen-confirm')).toHaveAttribute('data-face-found', 'true', { timeout: 10_000 });
+  await expect(page.locator('.screen-confirm .ph img')).toHaveAttribute('src', /^data:image\/jpeg/);
+});
+
+test('a camera that dies mid-countdown gives a friendly message, then Retake recovers', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.screen-welcome').click();
+  await page.locator('.screen-name .skip').click();
+  await expect(page.locator('.screen-camera .pill')).toBeEnabled({ timeout: 10_000 });
+  await page.locator('.screen-camera .pill').click();
+  await expect(page.locator('.screen-countdown')).toBeVisible();
+  await page.evaluate(() => {
+    const v = document.querySelector('video') as HTMLVideoElement | null;
+    (v?.srcObject as MediaStream | null)?.getTracks().forEach((t) => t.stop());
+  });
+  const confirm = page.locator('.screen-confirm');
+  await expect(confirm).toHaveAttribute('data-face-found', 'false', { timeout: 8_000 });
+  await expect(confirm.locator('.noface')).toBeVisible();
+  await expect(confirm.locator('.ph img')).toHaveCount(0); // no black photo
+  await confirm.getByRole('button', { name: 'Retake' }).click();
+  await expect(page.locator('.screen-camera .win')).toHaveAttribute('data-face', 'ok', { timeout: 15_000 });
 });
 
 test('skip uses "Festive Friend" and the QR leaves the name out', async ({ page }) => {

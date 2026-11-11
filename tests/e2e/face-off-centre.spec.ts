@@ -9,12 +9,16 @@ test.use({
   },
 });
 
-test('a face outside the head outline is not “Perfect”: hint shown, Take photo locked', async ({ page }) => {
+test('a face outside the head outline gets a hint (not “Perfect”), and the photo still counts', async ({ page }) => {
   await page.goto('/');
   await page.locator('.screen-welcome').click();
   await page.locator('.screen-name .skip').click();
   await expect(page.locator('.screen-camera .win')).toHaveAttribute('data-face', 'right', { timeout: 15_000 });
   await expect(page.locator('.screen-camera .chip')).toHaveText('Move a little to your right');
   await expect(page.locator('.screen-camera .head.ok')).toHaveCount(0);
-  await expect(page.locator('.screen-camera .pill')).toBeDisabled();
+  await expect(page.locator('.screen-camera .pill')).toBeEnabled();
+  await page.locator('.screen-camera .pill').click();
+  // A face is in the photo, just not centred: no "no face" message
+  await expect(page.locator('.screen-confirm')).toHaveAttribute('data-face-found', 'true', { timeout: 10_000 });
+  await expect(page.locator('.screen-confirm .noface')).toHaveCount(0);
 });

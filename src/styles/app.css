@@ -56,3 +56,11 @@ button:disabled { cursor: default; }
 
 /* Name: on-screen key lights up when the matching physical key is pressed */
 .screen-name .k.k-hit { transform: translateY(4px); box-shadow: 0 0 0 2px #EFE4CC, 0 1px 0 #E0D0AC; background: #FFF3B0; }
+
+/* Confirm: no face found in the photo */
+.screen-confirm .ph-empty { position: absolute; inset: 0; background: #2A2018; }
+.screen-confirm .noface { position: absolute; left: 14px; right: 14px; bottom: 14px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 14px; border-radius: 14px; background: rgba(227,0,11,.94); color: #fff; text-align: center; box-shadow: 0 8px 18px rgba(0,0,0,.35); animation: screenIn .3s ease-out both; }
+.screen-confirm .noface strong { font-family: "Rubik", sans-serif; font-weight: 900; font-size: 22px; text-transform: uppercase; letter-spacing: -.3px; }
+.screen-confirm .noface span { font-size: 16px; font-weight: 700; }
+.screen-confirm .retake-main { font-size: 26px; gap: 10px; }
+.screen-confirm .use-anyway { font-size: 22px; }

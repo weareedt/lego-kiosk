@@ -82,3 +82,20 @@ export function getFaceDetector(): Promise<FaceDetectorApi> {
   }
   return ready;
 }
+
+/**
+ * Checks a captured still for a face. Resolves true/false, or null if the
+ * detector isn't available (then we simply don't know, and don't complain).
+ */
+export async function photoHasFace(dataUrl: string): Promise<boolean | null> {
+  try {
+    const det = await getFaceDetector();
+    const img = new Image();
+    img.src = dataUrl;
+    await img.decode();
+    const faces = await det.detect(img);
+    return faces.length > 0;
+  } catch {
+    return null;
+  }
+}

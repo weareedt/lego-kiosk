@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('face in the outline unlocks Take photo with “Perfect”', async ({ page }) => {
+test('a face in the outline shows “Perfect”', async ({ page }) => {
   await page.goto('/');
   await page.locator('.screen-welcome').click();
   await page.locator('.screen-name .skip').click();

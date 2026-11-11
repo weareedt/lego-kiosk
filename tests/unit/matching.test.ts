@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTER_IDS, type CharacterId } from '../../src/lib/characters';
-import { POOLS, getStaffOverride, pickCharacter, readPhoto, setStaffOverride, type PhotoRead } from '../../src/lib/matching';
+import { POOLS, getStaffOverride, matchGuest, pickCharacter, readPhoto, setStaffOverride, type PhotoRead } from '../../src/lib/matching';
 
 const run = (read: PhotoRead, n: number) => {
   const counts: Partial<Record<CharacterId, number>> = {};
@@ -92,5 +92,23 @@ describe('photo read', () => {
   it('no photo or no face found → the unsure pool', async () => {
     expect(await readPhoto(null)).toBe('unsure');
     expect(await readPhoto('data:image/jpeg;base64,x', false)).toBe('unsure');
+  });
+});
+
+describe('real-world mix', () => {
+  it('guests with a face in their photo regularly get Elf Girl and Elf Boy', async () => {
+    const counts: Record<string, number> = {};
+    const n = 3000;
+    for (let i = 0; i < n; i++) {
+      const c = await matchGuest('data:image/jpeg;base64,x', true);
+      counts[c] = (counts[c] ?? 0) + 1;
+    }
+    // Expected ~14.5% each (45% masculine × 30% + 10% unsure × 10%), before variety rules.
+    for (const elf of ['elfgirl', 'elfboy']) {
+      expect(counts[elf] / n).toBeGreaterThan(0.08);
+      expect(counts[elf] / n).toBeLessThan(0.25);
+    }
+    // and every character turns up
+    expect(Object.keys(counts).sort()).toEqual([...CHARACTER_IDS].sort());
   });
 });

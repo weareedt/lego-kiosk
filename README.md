@@ -69,8 +69,8 @@ npm run test:all   # both
 First run of the end-to-end tests needs a browser: `npx playwright install chromium`.
 
 The end-to-end suite feeds Chromium a still of a guest (`tests/fixtures/face.y4m`)
-as the camera, so face detection runs for real. It covers face-in-frame (and the
-no-face hint and 10 s unlock), the full guest journey through to the auto reset, Retake,
+as the camera, so face detection runs for real. It covers face-in-frame (hints, never blocking,
+the no-face message on Confirm), the camera dropping out and Retake recovering, the full guest journey through to the auto reset, Retake,
 Skip, the keyboard (on-screen and laptop), the staff override, a blocked camera,
 the idle prompt (both outcomes), and the phone result page, including opening the
 kiosk’s QR link on a phone and getting the same character.
@@ -155,17 +155,21 @@ preview, entirely on the device. The runtime and model are copied from
 (`scripts/copy-mediapipe.mjs`), so it works without internet at the venue. Nothing
 is uploaded or stored.
 
-- **Take photo** unlocks only when a face sits inside the minifig-head outline at a
-  good distance. The frame turns green: “Perfect — hold that smile!”
-- Otherwise the chip gives a hint: *Move into the frame*, *Come a little closer*,
-  *Step back a little*, *Move a little to your left/right*, *Move up/down a little*.
-  Left/right accounts for the mirrored preview.
-- Groups are fine: one face in the outline is enough.
-- If no face is found for **10 s** (hats, costumes, little ones), Take photo unlocks
-  anyway, and that guest is matched from the “unsure” pool. If the detector can’t
-  load at all, the camera works as before and never blocks.
-- Tuning: outline geometry and size limits in `src/lib/faceFrame.ts`, the 10 s
-  fallback in `src/lib/config.ts`.
+- The outline turns green (“Perfect — hold that smile!”) when a face sits inside it
+  at a good distance. Otherwise the chip gives a hint: *Move into the frame*, *Come a
+  little closer*, *Step back a little*, *Move a little to your left/right*, *Move
+  up/down a little*. Left/right accounts for the mirrored preview.
+- **It never blocks.** Take photo works as soon as the camera is live: the photo is
+  just for fun. Groups are fine too.
+- After the shot, the still is checked for a face. If there isn’t one (guest
+  stepped out, covered up, a dark frame), Confirm says “We couldn’t spot a face!”
+  with Retake as the main button and *Use it anyway* beside it. That guest is matched
+  from the “unsure” pool.
+- Blank or black frames are never saved. If the camera stalls or drops out, Retake
+  restarts it automatically.
+- If the detector can’t load at all, the camera works as normal and the frame never
+  claims “Perfect”.
+- Tuning: outline geometry and size limits in `src/lib/faceFrame.ts`.
 
 Face *presence* is real. The masculine/feminine *read* used for matching is still
 simulated.

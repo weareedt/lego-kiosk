@@ -32,7 +32,5 @@ export const config = {
     height: 960,
     /** JPEG quality of the captured still. */
     quality: 0.9,
-    /** If no face is found in the outline for this long, Take photo unlocks anyway. */
-    unlockWithoutFaceAfter: 10_000,
   },
 } as const;

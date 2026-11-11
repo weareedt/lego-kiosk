@@ -1,23 +1,27 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { BackButton, Chrome } from '../components/Chrome';
 import { CameraPreview, useCamera } from '../lib/camera';
-import { config } from '../lib/config';
 import { FACE_HINT } from '../lib/faceFrame';
 import { useFaceCheck } from '../lib/useFaceCheck';
 
 /**
  * 03 · Camera. Live preview inside the photo window. On-device face detection
- * checks that a face sits inside the minifig-head outline before the shutter
- * unlocks, with hints ("Come a little closer"…). If no face is found for a
- * while (hats, costumes, little ones), Take photo unlocks anyway.
+ * guides the guest into the minifig-head outline (green "Perfect" or a hint
+ * like "Come a little closer"), but never blocks: Take photo works as soon as
+ * the camera is live. The photo is just for fun.
  */
-export function Camera(props: { onShoot: (faceFound: boolean) => void; onBack: () => void; onError: () => void }) {
+export function Camera(props: { onShoot: () => void; onBack: () => void; onError: () => void }) {
   const cam = useCamera();
   const { start, status } = cam;
   const video = useRef<HTMLVideoElement>(null);
+  // Start the camera on arrival (this also replaces a stalled stream, e.g. on Retake),
+  // and again if it stops by itself while the guest is here.
   useEffect(() => {
     start();
   }, [start]);
+  useEffect(() => {
+    if (status === 'idle') start();
+  }, [status, start]);
   useEffect(() => {
     if (status === 'denied' || status === 'unavailable') props.onError();
   }, [status, props]);
@@ -26,17 +30,9 @@ export function Camera(props: { onShoot: (faceFound: boolean) => void; onBack: (
   const face = useFaceCheck(video, live);
   const ok = live && face.state === 'ok';
 
-  // Never trap a guest: unlock the shutter after a while even without a face.
-  const [anyway, setAnyway] = useState(false);
-  useEffect(() => {
-    if (!live || ok) return;
-    const t = window.setTimeout(() => setAnyway(true), config.camera.unlockWithoutFaceAfter);
-    return () => window.clearTimeout(t);
-  }, [live, ok]);
-
-  // Without a detector the shutter is open, but the frame never claims "Perfect".
+  // Without a detector the frame never claims "Perfect".
   const noDetector = face.mode === 'off';
-  const canShoot = ok || (live && (anyway || noDetector));
+  const canShoot = live;
   const hint = !live || face.mode === 'loading'
     ? 'Starting camera…'
     : noDetector
@@ -85,7 +81,7 @@ export function Camera(props: { onShoot: (faceFound: boolean) => void; onBack: (
         className="pill"
         style={{ left: 162, right: 162, top: 880, opacity: canShoot ? 1 : 0.55 }}
         disabled={!canShoot}
-        onClick={() => props.onShoot(ok || noDetector)}
+        onClick={props.onShoot}
       >
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#E3000B" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
