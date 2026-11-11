@@ -57,42 +57,41 @@ to show the screen at the counter to collect the Stamp Card. Everything fits one
 screen on any phone. *Save my card* opens the share sheet on phones (where “Save
 Image” puts it in Photos) and downloads the original JPEG elsewhere. Broken links
 get a friendly “Match not found”. The result lives in the link itself; opening it
-also counts a QR scan for the usage dashboard.
+needs no backend.
 
 To host it somewhere else, set `VITE_QR_BASE_URL` in `.env.local` (see `.env.example`).
 
-### Usage dashboard (`/stats`)
+### Usage stats (`/stats`)
 
-Open **`/stats`** on the deployment (laptop or phone) for per-day usage across all
-iPads: guests, how far they got (name → camera → photo → matched → result → QR
-scan), guests by hour, cards handed out per character, camera problems, and a
-table of every day with a CSV download. It refreshes every minute. Days and hours
-are the iPad's local time; a QR scan counts on the day the guest played.
+The iPad counts its own usage, per day: guests who started, how far they got (name
+→ camera → photo → matched → result), guests by hour, cards handed out per
+character, and how often the camera error screen came up. Days and hours are the
+iPad’s local time. Only counts are kept (`src/lib/usage.ts`): no names or photos.
+QR scans happen on guests’ phones, so they aren’t counted.
 
-How it works: the kiosk and the phone result page send small events to
-`/api/events` (`src/lib/telemetry.ts`). Each event is queued on the device and
-retried, so a kiosk that drops off the venue Wi-Fi catches up later, and the
-server ignores repeats, so nothing is double counted. Events only bump counters in
-Redis (`server/telemetry.ts`): no names or photos are stored.
+**From anywhere:** open **`/stats`** on the deployment (laptop or phone). Every 3
+minutes, if anything changed, the iPad uploads its whole set of counts as one
+snapshot to `/api/usage` (`server/usage.ts`), so the numbers are at most a few
+minutes behind. If the venue Wi-Fi drops, the iPad keeps counting and catches up
+on the next upload. A second iPad would show up and be added in automatically.
 
-**One-time setup on Vercel:**
+**On the iPad:** on the Welcome screen, **press and hold the top-left corner for 3
+seconds**. The stats open in the app (works under Guided Access) with that iPad’s
+live counts and a **Back to kiosk** button. A normal tap there starts as usual.
 
-1. In the Vercel project, open **Storage → Create / Connect Database → Upstash
-   (Redis)**, pick the free plan, and connect it to this project. That adds
-   `KV_REST_API_URL` and `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_*`) to the
-   environment.
-2. Optional: add a `STATS_KEY` environment variable. `/stats` then asks for it once
-   per browser. Without it, anyone with the link can see the (anonymous) totals.
-3. Redeploy.
-
-Until storage is connected, `/stats` says so and the kiosk keeps its events queued
-on the device. Locally, `npm run dev` and `npm run preview` serve the same API from
-memory (reset on restart), so the dashboard works without Redis.
+**Storage:** Upstash Redis via Vercel. This project shares the team’s
+`fugglers-redis` database: everything is under one key, `lego-kiosk:usage`, and
+each upload is a single command (a few hundred a day at most), so it doesn’t
+affect Fugglers. To set up again: in Vercel, **Storage → Connect Database →
+fugglers-redis → lego-kiosk**, keep the default env var prefix
+(`KV_REST_API_URL` / `KV_REST_API_TOKEN`), then redeploy. Optional: set
+`STATS_KEY` to make `/stats` ask for a key. Locally, `npm run dev` / `npm run
+preview` serve the same API from memory.
 
 ## Tests
 
 ```bash
-npm test           # unit tests (Vitest): matching rules, QR links, telemetry API
+npm test           # unit tests (Vitest): matching rules, QR links, usage counts and API
 npm run test:e2e   # end-to-end (Playwright, Chromium fake camera): builds and runs the app
 npm run test:all   # both
 ```
@@ -104,14 +103,14 @@ as the camera, so face detection runs for real. It covers face-in-frame (hints, 
 the no-face message on Confirm), the camera dropping out and Retake recovering, the full guest journey through to the auto reset, Retake,
 Skip, the keyboard (on-screen and laptop), the staff override, a blocked camera,
 the idle prompt (both outcomes), and the phone result page, including opening the
-kiosk’s QR link on a phone and getting the same character, and usage events
-reaching `/stats`.
+kiosk’s QR link on a phone and getting the same character, the staff hold
+opening the usage stats, and the iPad’s upload reaching `/stats` elsewhere.
 
 ## Deploying to Vercel
 
 Import the repo in Vercel. The framework preset is Vite (build `npm run build`,
-output `dist`). `vercel.json` rewrites every route except `/api/*` to the app. Functions in
-`api/` serve the usage stats (see *Usage dashboard* for the Redis setup).
+output `dist`). `vercel.json` rewrites every route except `/api/*` to the app; `api/usage.ts`
+serves the usage stats (see *Usage stats* for the Redis setup).
 `VITE_QR_BASE_URL` is optional.
 
 ## iPad kiosk setup
@@ -138,7 +137,7 @@ src/
     IdlePrompt.tsx     “Still building?” overlay
   screens/             One file per screen (Welcome … StampCard, CameraError)
   result/              Phone result page opened from the QR (/match)
-  stats/               Staff usage dashboard (/stats)
+  stats/               Staff usage stats (/stats)
   lib/
     config.ts          Timings, name length, QR base URL, camera settings
     characters.ts      The 7 characters: copy, colours, images
@@ -149,7 +148,7 @@ src/
     useFaceCheck.ts    Runs the check on the live preview ~6×/second
     qr.ts              Session id + QR generation
     useIdle.ts         Inactivity / timeout hooks
-    telemetry.ts       Usage events, queued on the device and sent to /api/events
+    usage.ts           Per-day usage counts on this iPad + upload to /api/usage
   styles/
     kiosk.css          Screen styles ported from the design canvas (scoped per screen)
     app.css            Resets, stage, idle prompt, runtime states
@@ -206,4 +205,4 @@ match.
 - [ ] Ask the client for the welcome artwork and background exported at 2× iPad size
       (1488 × 2266). The current files are 744 × 1133.
 - [ ] Optional: offline caching (service worker) for patchy venue Wi-Fi
-- [ ] Staff screen for the character override (daily stats are at `/stats`)
+- [ ] Staff screen for the character override (usage stats are at `/stats`)

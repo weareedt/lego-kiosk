@@ -7,7 +7,7 @@ import { config } from './lib/config';
 import { photoHasFace } from './lib/faceDetector';
 import { matchGuest } from './lib/matching';
 import { newSessionId, qrDataUrl, resultUrl } from './lib/qr';
-import { track, type EventType } from './lib/telemetry';
+import { recordStep, type Step } from './lib/usage';
 import { useIdle } from './lib/useIdle';
 import { Camera } from './screens/Camera';
 import { CameraError } from './screens/CameraError';
@@ -45,8 +45,8 @@ const newSession = (): Session => ({
 });
 
 /** Inactivity before the "Still building?" prompt, for screens that have one. */
-/** Usage event sent the first time a session reaches each screen (for /stats). */
-const SCREEN_EVENT: Partial<Record<Screen, EventType>> = {
+/** Usage step counted the first time a guest reaches each screen (for /stats). */
+const SCREEN_STEP: Partial<Record<Screen, Step>> = {
   name: 'start',
   camera: 'camera',
   confirm: 'confirm',
@@ -100,14 +100,14 @@ export function App() {
     });
   };
 
-  // Usage telemetry: one event per session per step (retakes and repeats don't recount).
-  const tracked = useRef(new Set<string>());
+  // Usage counts: once per guest per step (retakes and repeats don't recount).
+  const counted = useRef(new Set<string>());
   useEffect(() => {
-    const type = SCREEN_EVENT[screen];
-    const key = `${session.id}:${type}`;
-    if (!type || tracked.current.has(key)) return;
-    tracked.current.add(key);
-    track(type, session.id, type === 'reveal' && session.character ? { character: session.character } : {});
+    const step = SCREEN_STEP[screen];
+    const key = `${session.id}:${step}`;
+    if (!step || counted.current.has(key)) return;
+    counted.current.add(key);
+    recordStep(step, step === 'reveal' && session.character ? { character: session.character } : {});
   }, [screen, session.id, session.character]);
 
   // Leave Matching once both the animation has finished and the result is ready.
@@ -210,7 +210,41 @@ export function App() {
       <div key={screen + session.id} className="scr-wrap screen-enter">
         {view}
       </div>
+      {screen === 'welcome' && <StaffHold onTap={() => go('name')} />}
       {prompt && <IdlePrompt onStay={() => setPrompt(false)} onStartOver={reset} />}
     </Stage>
+  );
+}
+
+/**
+ * Hidden staff entry to the usage stats: press and hold the top-left corner of
+ * the Welcome screen for 3 seconds. A normal tap there starts as usual.
+ */
+function StaffHold({ onTap }: { onTap: () => void }) {
+  const timer = useRef<number>();
+  const cancel = () => {
+    window.clearTimeout(timer.current);
+    timer.current = undefined;
+  };
+  useEffect(() => cancel, []);
+  return (
+    <div
+      className="staff-hold"
+      aria-hidden
+      onPointerDown={() => {
+        cancel();
+        timer.current = window.setTimeout(() => {
+          timer.current = undefined;
+          location.assign('/stats');
+        }, config.staffHoldMs);
+      }}
+      onPointerUp={() => {
+        if (timer.current === undefined) return;
+        cancel();
+        onTap();
+      }}
+      onPointerLeave={cancel}
+      onPointerCancel={cancel}
+    />
   );
 }

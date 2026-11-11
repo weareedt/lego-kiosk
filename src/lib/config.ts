@@ -18,6 +18,9 @@ export const config = {
     final: 45_000,
   },
 
+  /** Hold the Welcome screen's top-left corner this long to open the staff usage stats (/stats). */
+  staffHoldMs: 3_000,
+
   countdownSeconds: 3,
   /** Length of the Matching "theatre" animation. */
   matchingDuration: 4_500,

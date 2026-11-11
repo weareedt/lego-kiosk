@@ -78,3 +78,6 @@ button:disabled { cursor: default; }
 .screen-reveal .ring { stroke-dasharray: 88; animation: drainOnce linear 1 both; }
 @keyframes drainOnce { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 88; } }
 .screen-reveal .staff-finish { position: absolute; right: 24px; bottom: 24px; height: 44px; padding: 0 18px; border-radius: 999px; background: rgba(255,255,255,.55); color: #3A3328; font-family: "Rubik", sans-serif; font-weight: 800; font-size: 15px; letter-spacing: 1px; text-transform: uppercase; }
+
+/* Hidden staff hotspot on Welcome: hold 3 s to open /stats (see StaffHold in App.tsx) */
+.staff-hold { position: absolute; left: 0; top: 0; width: 120px; height: 120px; z-index: 5; touch-action: none; -webkit-touch-callout: none; }

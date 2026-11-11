@@ -1,36 +1,29 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CHARACTERS, CHARACTER_IDS } from '../lib/characters';
+import { kioskId, loadUsage, type DayStats } from '../lib/usage';
 import './stats.css';
 
 /**
- * Staff usage dashboard at /stats. Reads per-day totals from /api/stats
- * (see server/telemetry.ts) and refreshes every minute.
+ * Staff usage stats at /stats. Open it from anywhere (it reads the online copy
+ * the iPad uploads every few minutes, see server/usage.ts), or on the iPad by
+ * holding the Welcome screen's top-left corner for 3 seconds (then this iPad's
+ * own, up-to-the-second counts are used for it).
  */
 
-interface DayStats {
-  day: string;
-  counts: Record<string, number>;
+type Days = Record<string, Record<string, number>>;
+interface Snapshot {
+  at: string;
+  days: Days;
 }
 
-type Load =
+type Online =
   | { state: 'loading' }
-  | { state: 'ok'; days: DayStats[]; at: Date }
+  | { state: 'ok'; kiosks: Record<string, Snapshot> }
   | { state: 'locked'; wrong: boolean }
-  | { state: 'unconfigured' }
-  | { state: 'error'; message: string };
+  | { state: 'unavailable'; reason: string };
 
 const KEY_STORAGE = 'stf.statsKey';
 const REFRESH_MS = 60_000;
-
-/** The kiosk flow, in order. "Started" = tapped Welcome and reached the name screen. */
-const STEPS = [
-  { type: 'start', label: 'Started' },
-  { type: 'camera', label: 'Reached camera' },
-  { type: 'confirm', label: 'Took a photo' },
-  { type: 'matching', label: 'Got matched' },
-  { type: 'reveal', label: 'Saw their result' },
-  { type: 'qr', label: 'Scanned the QR' },
-] as const;
 
 const readKey = () => {
   try {
@@ -39,13 +32,41 @@ const readKey = () => {
     return '';
   }
 };
-const writeKey = (k: string) => {
-  try {
-    localStorage.setItem(KEY_STORAGE, k);
-  } catch {
-    /* ignore */
-  }
+
+/** Adds up every iPad's counts; this iPad's live counts replace its uploaded copy. */
+function combine(kiosks: Record<string, Snapshot>, self: string | null, local: DayStats[]): DayStats[] {
+  const all: Days[] = Object.entries(kiosks)
+    .filter(([id]) => !(id === self && local.length))
+    .map(([, s]) => s.days);
+  if (local.length) all.push(Object.fromEntries(local.map((d) => [d.day, d.counts])));
+  const out: Days = {};
+  for (const days of all)
+    for (const [day, counts] of Object.entries(days)) {
+      const o = (out[day] ??= {});
+      for (const [k, v] of Object.entries(counts)) o[k] = (o[k] ?? 0) + v;
+    }
+  return Object.keys(out)
+    .sort()
+    .map((day) => ({ day, counts: out[day] }));
+}
+
+const ago = (iso: string) => {
+  const min = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+  if (!Number.isFinite(min)) return 'unknown';
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min} min ago`;
+  const h = Math.floor(min / 60);
+  return h < 24 ? `${h} h ago` : `${Math.floor(h / 24)} d ago`;
 };
+
+/** The kiosk flow, in order. "Started" = tapped Welcome and reached the name screen. */
+const STEPS = [
+  { type: 'start', label: 'Started' },
+  { type: 'camera', label: 'Reached camera' },
+  { type: 'confirm', label: 'Took a photo' },
+  { type: 'matching', label: 'Got matched' },
+  { type: 'reveal', label: 'Saw their result' },
+] as const;
 
 const n = (c: Record<string, number>, k: string) => c[k] ?? 0;
 const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '–');
@@ -58,6 +79,7 @@ const parseDay = (d: string) => {
 const dayShort = (d: string) => parseDay(d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 const dayLong = (d: string) => parseDay(d).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? 'am' : 'pm'}`;
+const hourKey = (step: string, h: number) => `${step}@${String(h).padStart(2, '0')}`;
 
 function sumCounts(days: DayStats[]): Record<string, number> {
   const out: Record<string, number> = {};
@@ -65,29 +87,49 @@ function sumCounts(days: DayStats[]): Record<string, number> {
   return out;
 }
 
+/** Busiest hour of the day by guests started, or null if nobody started. */
+function busiestHour(c: Record<string, number>): number | null {
+  let best: number | null = null;
+  for (let h = 0; h < 24; h++) if (n(c, hourKey('start', h)) > (best === null ? 0 : n(c, hourKey('start', best)))) best = h;
+  return best;
+}
+
 export function StatsPage() {
+  const [local] = useState(loadUsage);
+  const [self] = useState(() => kioskId(false));
   const [key, setKey] = useState(readKey);
-  const [load, setLoad] = useState<Load>({ state: 'loading' });
+  const [online, setOnline] = useState<Online>({ state: 'loading' });
   const [selected, setSelected] = useState<string | null>(null);
 
-  const fetchStats = useCallback(async () => {
+  const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/stats', { headers: key ? { 'x-stats-key': key } : {}, cache: 'no-store' });
-      if (res.status === 401) return setLoad({ state: 'locked', wrong: !!key });
-      if (res.status === 503) return setLoad({ state: 'unconfigured' });
-      if (!res.ok) return setLoad({ state: 'error', message: `The stats service returned ${res.status}.` });
-      const body = (await res.json()) as { days: DayStats[]; at: string };
-      setLoad({ state: 'ok', days: body.days, at: new Date(body.at) });
+      const res = await fetch('/api/usage', { headers: key ? { 'x-stats-key': key } : {}, cache: 'no-store' });
+      if (res.status === 401) return setOnline({ state: 'locked', wrong: !!key });
+      if (res.status === 503) return setOnline({ state: 'unavailable', reason: 'Online stats aren’t connected yet.' });
+      if (!res.ok) return setOnline({ state: 'unavailable', reason: `Online stats returned an error (${res.status}).` });
+      const body = (await res.json()) as { kiosks: Record<string, Snapshot> };
+      setOnline({ state: 'ok', kiosks: body.kiosks ?? {} });
     } catch {
-      setLoad((prev) => (prev.state === 'ok' ? prev : { state: 'error', message: 'Couldn’t reach the stats service. Check the connection.' }));
+      setOnline((prev) => (prev.state === 'ok' ? prev : { state: 'unavailable', reason: 'Couldn’t reach the online stats.' }));
     }
   }, [key]);
 
   useEffect(() => {
-    void fetchStats();
-    const t = window.setInterval(fetchStats, REFRESH_MS);
+    void refresh();
+    const t = window.setInterval(refresh, REFRESH_MS);
     return () => window.clearInterval(t);
-  }, [fetchStats]);
+  }, [refresh]);
+
+  const days = useMemo(() => combine(online.state === 'ok' ? online.kiosks : {}, self, local), [online, self, local]);
+  const others = online.state === 'ok' ? Object.entries(online.kiosks).filter(([id]) => !(id === self && local.length)) : [];
+  const latest = others.map(([, s]) => s.at).sort().pop();
+
+  let source: string;
+  if (online.state === 'loading') source = local.length ? 'This iPad · loading online stats…' : 'Loading…';
+  else if (online.state === 'ok') {
+    const ipads = others.length + (local.length ? 1 : 0);
+    source = !ipads ? '' : `${ipads === 1 ? '1 iPad' : `${ipads} iPads`}${local.length ? ' · this iPad live' : ''}${latest ? ` · last upload ${ago(latest)}` : ''}`;
+  } else source = local.length ? 'This iPad only' : '';
 
   return (
     <div className="st">
@@ -95,39 +137,41 @@ export function StatsPage() {
         <div>
           <h1>Kiosk usage</h1>
           <p className="st-sub">
-            LEGO® Santa’s Toy Factory
-            {load.state === 'ok' && <> · updated {load.at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</>}
+            LEGO® Santa’s Toy Factory{source && <> · {source}</>}
           </p>
         </div>
-        {load.state === 'ok' && (
-          <div className="st-actions">
-            <button className="st-btn" onClick={() => void fetchStats()}>
-              Refresh
+        <div className="st-actions">
+          <button className="st-btn" onClick={() => void refresh()}>
+            Refresh
+          </button>
+          <button className="st-btn" onClick={() => downloadCsv(days)} disabled={!days.length}>
+            Download CSV
+          </button>
+          {self && (
+            <button className="st-btn st-btn-primary" onClick={() => location.assign('/')}>
+              Back to kiosk
             </button>
-            <button className="st-btn" onClick={() => downloadCsv(load.days)} disabled={!load.days.length}>
-              Download CSV
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </header>
 
-      {load.state === 'loading' && <p className="st-note">Loading…</p>}
-      {load.state === 'error' && <p className="st-note">{load.message}</p>}
-      {load.state === 'unconfigured' && (
-        <p className="st-note">
-          Stats storage isn’t connected yet. Add an Upstash Redis database to this project in Vercel (Storage tab), then redeploy.
-        </p>
-      )}
-      {load.state === 'locked' && (
+      {online.state === 'unavailable' && <p className="st-note">{online.reason}{local.length ? ' Showing this iPad’s own counts.' : ''}</p>}
+      {online.state === 'locked' && (
         <KeyForm
-          wrong={load.wrong}
+          wrong={online.wrong}
           onSubmit={(k) => {
-            writeKey(k);
+            try {
+              localStorage.setItem(KEY_STORAGE, k);
+            } catch {
+              /* ignore */
+            }
             setKey(k);
           }}
         />
       )}
-      {load.state === 'ok' && <Dashboard days={load.days} selected={selected} onSelect={setSelected} />}
+      {(online.state !== 'loading' || local.length > 0) && !(online.state === 'locked' && !local.length) && (
+        <Dashboard days={days} selected={selected} onSelect={setSelected} />
+      )}
     </div>
   );
 }
@@ -142,7 +186,7 @@ function KeyForm({ wrong, onSubmit }: { wrong: boolean; onSubmit: (k: string) =>
         if (v.trim()) onSubmit(v.trim());
       }}
     >
-      <label htmlFor="st-key">{wrong ? 'That key didn’t work. Try again.' : 'Enter the stats key to view usage.'}</label>
+      <label htmlFor="st-key">{wrong ? 'That key didn’t work. Try again.' : 'Enter the stats key to see all iPads.'}</label>
       <div className="st-key-row">
         <input id="st-key" type="password" autoComplete="off" value={v} onChange={(e) => setV(e.target.value)} />
         <button className="st-btn st-btn-primary" type="submit">
@@ -160,6 +204,7 @@ function Dashboard({ days, selected, onSelect }: { days: DayStats[]; selected: s
   }
   const day = days.find((d) => d.day === selected) ?? days[days.length - 1];
   const busiest = days.reduce((a, b) => (n(b.counts, 'start') > n(a.counts, 'start') ? b : a));
+  const peak = busiestHour(day.counts);
 
   return (
     <>
@@ -170,8 +215,8 @@ function Dashboard({ days, selected, onSelect }: { days: DayStats[]; selected: s
         <div className="st-tiles">
           <Tile label="Guests" value={fmt(n(total, 'start'))} />
           <Tile label="Saw their result" value={fmt(n(total, 'reveal'))} note={`${pct(n(total, 'reveal'), n(total, 'start'))} of guests`} />
-          <Tile label="Scanned the QR" value={fmt(n(total, 'qr'))} note={`${pct(n(total, 'qr'), n(total, 'reveal'))} of results`} />
           <Tile label="Busiest day" value={dayShort(busiest.day)} note={`${fmt(n(busiest.counts, 'start'))} guests`} />
+          <Tile label="Camera problems" value={fmt(n(total, 'cameraError'))} note="camera error screen shown" />
         </div>
       </section>
 
@@ -187,7 +232,7 @@ function Dashboard({ days, selected, onSelect }: { days: DayStats[]; selected: s
               <>
                 <strong>{dayShort(d.day)}</strong>
                 <br />
-                {fmt(n(d.counts, 'start'))} guests · {fmt(n(d.counts, 'reveal'))} results · {fmt(n(d.counts, 'qr'))} QR scans
+                {fmt(n(d.counts, 'start'))} guests · {fmt(n(d.counts, 'reveal'))} saw their result
               </>
             ),
           }))}
@@ -210,7 +255,11 @@ function Dashboard({ days, selected, onSelect }: { days: DayStats[]; selected: s
         <div className="st-tiles">
           <Tile label="Guests" value={fmt(n(day.counts, 'start'))} />
           <Tile label="Saw their result" value={fmt(n(day.counts, 'reveal'))} note={`${pct(n(day.counts, 'reveal'), n(day.counts, 'start'))} of guests`} />
-          <Tile label="Scanned the QR" value={fmt(n(day.counts, 'qr'))} note={`${pct(n(day.counts, 'qr'), n(day.counts, 'reveal'))} of results`} />
+          <Tile
+            label="Busiest hour"
+            value={peak === null ? '–' : hourLabel(peak)}
+            note={peak === null ? 'no guests' : `${fmt(n(day.counts, hourKey('start', peak)))} guests`}
+          />
           <Tile label="Camera problems" value={fmt(n(day.counts, 'cameraError'))} note="camera error screen shown" />
         </div>
 
@@ -324,7 +373,7 @@ function Bars({ items, selected, onSelect, labelEvery = 1 }: { items: BarItem[];
 }
 
 function HourBars({ counts }: { counts: Record<string, number> }) {
-  const byHour = Array.from({ length: 24 }, (_, h) => n(counts, `start@${String(h).padStart(2, '0')}`));
+  const byHour = Array.from({ length: 24 }, (_, h) => n(counts, hourKey('start', h)));
   const active = byHour.map((v, h) => (v > 0 ? h : -1)).filter((h) => h >= 0);
   if (!active.length) return <p className="st-hint">No guests this day.</p>;
   // Show the hours the kiosk was in use, padded by one hour either side.
@@ -381,7 +430,6 @@ function HBars({ rows, max }: { rows: { label: string; value: number; note: stri
 const COLUMNS: { label: string; get: (c: Record<string, number>) => string }[] = [
   ...STEPS.map((s) => ({ label: s.label, get: (c: Record<string, number>) => fmt(n(c, s.type)) })),
   { label: 'Result rate', get: (c) => pct(n(c, 'reveal'), n(c, 'start')) },
-  { label: 'QR scan rate', get: (c) => pct(n(c, 'qr'), n(c, 'reveal')) },
   { label: 'Camera problems', get: (c) => fmt(n(c, 'cameraError')) },
 ];
 

@@ -125,12 +125,13 @@ body.is-stats #root { height: auto; min-height: 100%; }
 .st-table th[scope="row"], .st-table thead th:first-child { text-align: left; }
 .st-table tfoot th, .st-table tfoot td { font-weight: 800; border-bottom: 0; }
 
-.st-key label { display: block; font-weight: 700; margin-bottom: 10px; }
-.st-key-row { display: flex; gap: 8px; }
-.st-key input { flex: 1; max-width: 280px; height: 36px; border-radius: 8px; border: 1px solid var(--st-border); background: var(--st-page); color: var(--st-text); padding: 0 10px; font: inherit; }
 
 @media (max-width: 520px) {
   .st h1 { font-size: 24px; }
   .st-hbars li { grid-template-columns: 96px 1fr auto; }
   .st-bars-plot { height: 180px; }
 }
+
+.st-key label { display: block; font-weight: 700; margin-bottom: 10px; }
+.st-key-row { display: flex; gap: 8px; }
+.st-key input { flex: 1; max-width: 280px; height: 36px; border-radius: 8px; border: 1px solid var(--st-border); background: var(--st-page); color: var(--st-text); padding: 0 10px; font: inherit; }

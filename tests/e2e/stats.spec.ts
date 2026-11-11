@@ -1,16 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-/** Collects the usage events a page sends to /api/events. */
-function watchEvents(page: Page) {
-  const sent: { type: string; session: string; character?: string }[] = [];
-  page.on('request', (r) => {
-    if (r.url().endsWith('/api/events') && r.method() === 'POST') sent.push(...(r.postDataJSON().events ?? []));
-  });
-  return sent;
-}
-
-test('a guest journey and a QR scan are counted, and /stats shows them', async ({ page, browser }) => {
-  const sent = watchEvents(page);
+test('a guest is counted, and holding the Welcome corner opens the stats', async ({ page }) => {
   await page.goto('/');
   await page.locator('.screen-welcome').click();
   await page.locator('.screen-name .skip').click();
@@ -18,26 +8,54 @@ test('a guest journey and a QR scan are counted, and /stats shows them', async (
   await page.locator('.screen-camera .pill').click();
   await page.locator('.screen-confirm .pill').click({ timeout: 8_000 });
   await expect(page.locator('.screen-reveal')).toBeVisible({ timeout: 8_000 });
-  const href = new URL((await page.locator('.screen-reveal .collect-qr img').getAttribute('data-href'))!);
-  const session = href.searchParams.get('s')!;
+  const character = new URL((await page.locator('.screen-reveal .collect-qr img').getAttribute('data-href'))!).searchParams.get('c');
 
-  await expect
-    .poll(() => sent.filter((e) => e.session === session).map((e) => e.type))
-    .toEqual(['start', 'camera', 'confirm', 'matching', 'reveal']);
-  expect(sent.find((e) => e.type === 'reveal')?.character).toBe(href.searchParams.get('c'));
+  // Staff Finish → Welcome, then hold the top-left corner for 3 s.
+  await page.goto('/');
+  const box = (await page.locator('.staff-hold').boundingBox())!;
+  await page.mouse.move(box.x + 20, box.y + 20);
+  await page.mouse.down();
+  await page.waitForURL('**/stats', { timeout: 6_000 });
+  await page.mouse.up();
 
-  // The guest scans the QR on their phone.
-  const phone = await browser.newPage();
-  const phoneSent = watchEvents(phone);
-  await phone.goto(href.pathname + href.search);
-  await expect.poll(() => phoneSent.map((e) => `${e.type}:${e.session}`)).toContain(`qr:${session}`);
-  await phone.close();
-
-  const stats = await (await page.request.get('/api/stats')).json();
-  const counted = stats.days.reduce((a: number, d: { counts: Record<string, number> }) => a + (d.counts.qr ?? 0), 0);
-  expect(counted).toBeGreaterThan(0);
-
-  await page.goto('/stats');
   await expect(page.locator('.st h1')).toHaveText('Kiosk usage');
-  await expect(page.locator('.st-table tbody tr').first()).toBeVisible();
+  const today = page.locator('.st-table tbody tr').first();
+  await expect(today.locator('td').first()).toHaveText('1'); // started
+  await expect(page.locator('.st-hbars li', { hasText: /Saw their result/ })).toContainText('1');
+  const names: Record<string, string> = { elfboy: 'Elf Boy', elfgirl: 'Elf Girl', santa: 'Santa', reindeer: 'Reindeer', gingerbread: 'Gingerbread', snowman: 'Snowman', yeti: 'Yeti' };
+  await expect(page.locator('.st-hbars li', { hasText: names[character!] })).toContainText('1');
+
+  await page.getByRole('button', { name: 'Back to kiosk' }).click();
+  await expect(page.locator('.screen-welcome')).toBeVisible();
+});
+
+test('a quick tap on the Welcome corner starts like anywhere else', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('.staff-hold').click();
+  await expect(page.locator('.screen-name')).toBeVisible();
+});
+
+test('the iPad uploads its counts, and /stats elsewhere shows them', async ({ page, browser }) => {
+  await page.goto('/');
+  await page.locator('.screen-welcome').click();
+  await page.locator('.screen-name .skip').click();
+  await expect(page.locator('.screen-camera .pill')).toBeEnabled({ timeout: 10_000 });
+  await page.locator('.screen-camera .pill').click();
+  await page.locator('.screen-confirm .pill').click({ timeout: 8_000 });
+  await expect(page.locator('.screen-reveal')).toBeVisible({ timeout: 8_000 });
+
+  // The kiosk uploads on load (and every few minutes); reload to trigger it now.
+  const uploaded = page.waitForResponse((r) => r.url().endsWith('/api/usage') && r.request().method() === 'POST' && r.ok());
+  await page.goto('/');
+  await uploaded;
+  const id = await page.evaluate(() => localStorage.getItem('stf.kioskId'));
+
+  const laptop = await browser.newPage(); // no local counts: online copy only
+  const body = await (await laptop.request.get('/api/usage')).json();
+  expect(body.kiosks[id!].days).toBeTruthy();
+  await laptop.goto('/stats');
+  await expect(laptop.locator('.st-sub')).toContainText('iPad');
+  await expect(laptop.locator('.st-table tbody tr').first()).toBeVisible();
+  await expect(laptop.getByRole('button', { name: 'Back to kiosk' })).toHaveCount(0);
+  await laptop.close();
 });

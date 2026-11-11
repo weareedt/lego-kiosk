@@ -13,19 +13,22 @@ import { ResultPage } from './result/ResultPage';
 import { CameraProvider } from './lib/camera';
 import { CHARACTER_IDS, type CharacterId } from './lib/characters';
 import { setStaffOverride } from './lib/matching';
-import { startTelemetry } from './lib/telemetry';
+import { startUsageSync } from './lib/usage';
 import { StatsPage } from './stats/StatsPage';
 
 // /match is the guest's phone result page (opened from the kiosk QR), /stats is the staff
-// usage dashboard; everything else is the kiosk.
+// usage stats (open from anywhere, or hold the Welcome screen's top-left corner); everything
+// else is the kiosk.
 const path = location.pathname.replace(/\/+$/, '');
 const isResultPage = path === '/match';
 const isStatsPage = path === '/stats';
 
 if (isStatsPage) document.body.classList.add('is-stats');
-else startTelemetry();
 
 if (!isResultPage && !isStatsPage) {
+  // Keep the online copy of this iPad's usage counts up to date (for /stats from anywhere).
+  startUsageSync();
+
   // Staff override for photo ops: open the kiosk with ?force=santa (one-shot, next guest only).
   const force = new URLSearchParams(location.search).get('force') as CharacterId | null;
   if (force && CHARACTER_IDS.includes(force)) setStaffOverride(force);
