@@ -1,15 +1,15 @@
 # LEGO® Santa’s Toy Factory — Character Match Kiosk
 
 An iPad mini event-booth kiosk. Guests enter their name, take a photo, watch the
-“factory” find their festive LEGO character, and get a QR code to collect a Stamp
-Card at the counter.
+“factory” find their festive LEGO character, and get a QR code to collect a
+character card from the crew.
 
 Built with React + Vite + TypeScript. It runs in Safari as a full-screen web app.
 
 ## Flow
 
 ```
-01 Welcome → 02 Name → 03 Camera → 03b 3-2-1 → 04 Confirm → 05 Matching → 06 Reveal + collect Stamp Card (QR) → reset
+01 Welcome → 02 Name → 03 Camera → 03b 3-2-1 → 04 Confirm → 05 Matching → 06 Reveal + collect character card (QR) → reset
 ```
 
 | Screen | Moves on | Timeout |
@@ -20,7 +20,7 @@ Built with React + Vite + TypeScript. It runs in Safari as a full-screen web app
 | 03b Countdown | Automatic (3 s), captures a still | — |
 | 04 Confirm | Use this photo / Retake | 20 s → “Still building?” |
 | 05 Matching | Automatic (4.5 s), not interruptible | — |
-| 06 Reveal + collect | No guest button: scan the QR, show it at the counter | 45 s → reset (staff can tap Finish) |
+| 06 Reveal + collect | No guest button: scan the QR, show it to the crew | 45 s → reset (staff can tap Finish) |
 
 “Still building?” waits 10 s, then starts over. A reset clears the name, photo and
 match, and stops the camera. If the camera is blocked or missing, the guest sees a
@@ -53,7 +53,7 @@ deployment, on the guest’s phone:
 It shows the client’s finished match card for their character
 (`public/assets/cards/<id>.jpg`, 1080×1350, shown untouched) in a frame, with their
 name above (“ANNA, you’re the Elf Girl!”), a **Save my card** button, and a reminder
-to show the screen at the counter to collect the Stamp Card. Everything fits one
+to show the screen to the crew to get a character card. Everything fits one
 screen on any phone. *Save my card* opens the share sheet on phones (where “Save
 Image” puts it in Photos) and downloads the original JPEG elsewhere. Broken links
 get a friendly “Match not found”. The result lives in the link itself; opening it
@@ -135,7 +135,7 @@ src/
     Chrome.tsx         Background, sign header (from the client PSD), brand marks, Back
     Stage.tsx          Scales the 744×1133 canvas to the screen
     IdlePrompt.tsx     “Still building?” overlay
-  screens/             One file per screen (Welcome … StampCard, CameraError)
+  screens/             One file per screen (Welcome … Reveal, CameraError)
   result/              Phone result page opened from the QR (/match)
   stats/               Staff usage stats (/stats)
   lib/

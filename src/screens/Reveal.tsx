@@ -15,9 +15,9 @@ const CONFETTI = [
 ];
 
 /**
- * 06 · Reveal + collect (the final screen; Reveal and Stamp Card combined).
+ * 06 · Reveal + collect (the final screen: the reveal and how to collect the character card).
  * The character reveal, then one clear next step: scan the QR to save the
- * card, and show it at the counter for the Stamp Card. There is no guest
+ * card, and show it to the crew for a character card. There is no guest
  * "Done" button to walk away on: the screen stays up, then resets itself.
  * Staff can tap the small Finish button to reset early.
  */
@@ -41,8 +41,8 @@ export function Reveal(props: { name: string; character: Character; qr: string |
         <h1 className="d ext" style={{ fontSize: 60 }}>{c.name}</h1>
       </div>
 
-      <section className="collect" aria-label="Collect your Stamp Card">
-        <div className="collect-head">COLLECT YOUR STAMP CARD</div>
+      <section className="collect" aria-label="Collect your character card">
+        <div className="collect-head">COLLECT YOUR CHARACTER CARD</div>
         <div className="collect-body">
           <div className="collect-qr">{props.qr && <img src={props.qr} data-href={props.qrHref ?? undefined} alt="QR code to save your match card" />}</div>
           <ol className="collect-steps">

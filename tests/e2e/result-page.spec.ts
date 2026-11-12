@@ -12,14 +12,14 @@ const CARDS = {
   yeti: 'Yeti',
 } as const;
 
-test('phone result page shows the client card, the name, Save and the counter reminder', async ({ page }) => {
+test('phone result page shows the client card, the name, Save and the crew reminder', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/match?s=AB12CD&c=elfgirl&n=ANNA&t=1796000000');
   await expect(page.locator('.rp-pre')).toHaveText('ANNA, you’re the Elf Girl!');
   await expect(page.locator('.rp-card')).toHaveAttribute('src', '/assets/cards/elfgirl.jpg');
   await expect(page.getByRole('button', { name: 'Save my card' })).toBeVisible();
-  await expect(page.locator('.rp-note')).toContainText('collect your LEGO® Stamp Card');
+  await expect(page.locator('.rp-note')).toHaveText(/Show this screen to our crew\s*to get a character card!/);
   for (const img of await page.locator('img').all()) {
     expect(await img.evaluate((i: HTMLImageElement) => i.decode().then(() => i.naturalWidth))).toBeGreaterThan(0);
   }

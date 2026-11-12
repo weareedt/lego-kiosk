@@ -6,8 +6,8 @@ import './result.css';
 /**
  * Phone result page, opened from the kiosk QR (/match?s=…&c=…&n=…&t=…).
  * Shows the client's match card for the guest's character, exactly as
- * designed, in a frame, with a button to save it and a reminder to show it at
- * the counter for their Stamp Card. Fits one screen, no scrolling.
+ * designed, in a frame, with a button to save it and a reminder to show it to
+ * the crew for a character card. Fits one screen, no scrolling.
  */
 export function ResultPage({ search = window.location.search }: { search?: string }) {
   const r = parseResult(search);
@@ -40,9 +40,9 @@ export function ResultPage({ search = window.location.search }: { search?: strin
       </div>
       <SaveButton character={c} name={r.name} />
       <p className="rp-note">
-        Show this screen at the counter
+        Show this screen to our crew
         <br />
-        to collect your LEGO® Stamp Card
+        to get a character card!
       </p>
     </div>
   );

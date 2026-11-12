@@ -27,7 +27,7 @@ async function toConfirm(page: Page, name = 'ANNA') {
   await expect(page.locator('.screen-confirm')).toBeVisible({ timeout: 6_000 });
 }
 
-test('full guest journey: welcome to reveal to stamp card to auto reset', async ({ page }) => {
+test('full guest journey: welcome to reveal and collect to auto reset', async ({ page }) => {
   const errors = watchErrors(page);
   await toConfirm(page);
 
@@ -52,7 +52,7 @@ test('full guest journey: welcome to reveal to stamp card to auto reset', async 
 
   // One final screen: the next step is clear and there's no guest "Done" to walk away on
   const collect = page.locator('.screen-reveal .collect');
-  await expect(collect).toContainText('COLLECT YOUR STAMP CARD');
+  await expect(collect).toContainText('COLLECT YOUR CHARACTER CARD');
   await expect(collect).toContainText('Scan to save your match card');
   await expect(collect).toContainText('Show it to our crew to get a character card!');
   await expect(page.locator('.screen-reveal').getByRole('button', { name: /done/i })).toHaveCount(0);
