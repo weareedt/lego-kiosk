@@ -54,7 +54,7 @@ test('full guest journey: welcome to reveal to stamp card to auto reset', async 
   const collect = page.locator('.screen-reveal .collect');
   await expect(collect).toContainText('COLLECT YOUR STAMP CARD');
   await expect(collect).toContainText('Scan to save your match card');
-  await expect(collect).toContainText('Show it at the counter to get your Stamp Card');
+  await expect(collect).toContainText('Show it to our crew to get a character card!');
   await expect(page.locator('.screen-reveal').getByRole('button', { name: /done/i })).toHaveCount(0);
   await expect(page.locator('.screen-reveal .rst')).toContainText('Starting over for the next elf');
 

@@ -55,7 +55,7 @@ export function Reveal(props: { name: string; character: Character; qr: string |
             <li>
               <b>2</b>
               <span>
-                <strong>Show it at the counter</strong> to get your Stamp Card
+                <strong>Show it to our crew</strong> to get a character card!
               </span>
             </li>
           </ol>
