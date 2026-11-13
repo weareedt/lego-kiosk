@@ -23,7 +23,11 @@ const path = location.pathname.replace(/\/+$/, '');
 const isResultPage = path === '/match';
 const isStatsPage = path === '/stats';
 
-if (isStatsPage) document.body.classList.add('is-stats');
+if (isStatsPage) {
+  document.body.classList.add('is-stats');
+  document.title = 'Kiosk usage · LEGO® Santa’s Toy Factory';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#E3000B');
+}
 
 if (!isResultPage && !isStatsPage) {
   // Keep the online copy of this iPad's usage counts up to date (for /stats from anywhere).

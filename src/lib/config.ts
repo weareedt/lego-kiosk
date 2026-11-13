@@ -21,6 +21,12 @@ export const config = {
   /** Hold the Welcome screen's top-left corner this long to open the staff usage stats (/stats). */
   staffHoldMs: 3_000,
 
+  /**
+   * Official event dates (local days, inclusive). /stats and its CSV only show
+   * these days; counts from earlier testing are kept but hidden.
+   */
+  event: { start: '2026-11-13', end: '2026-12-27' },
+
   countdownSeconds: 3,
   /** Length of the Matching "theatre" animation. */
   matchingDuration: 4_500,

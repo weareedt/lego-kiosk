@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CHARACTERS, CHARACTER_IDS } from '../lib/characters';
-import { kioskId, loadUsage, type DayStats } from '../lib/usage';
+import { config } from '../lib/config';
+import { kioskId, loadUsage, localDay, type DayStats } from '../lib/usage';
 import './stats.css';
 
 /**
@@ -81,6 +82,21 @@ const dayLong = (d: string) => parseDay(d).toLocaleDateString(undefined, { weekd
 const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? 'am' : 'pm'}`;
 const hourKey = (step: string, h: number) => `${step}@${String(h).padStart(2, '0')}`;
 
+const DAY_MS = 24 * 3600 * 1000;
+const dayNumber = (d: string) => Math.round((parseDay(d).getTime() - parseDay(config.event.start).getTime()) / DAY_MS) + 1;
+
+/** "13 Nov – 27 Dec · day 3 of 45" (or "starts …" / "ended"). */
+function eventProgress(): string {
+  const { start, end } = config.event;
+  const fmtShort = (d: string) => parseDay(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const range = `${fmtShort(start)} – ${fmtShort(end)}`;
+  const today = localDay(new Date());
+  const total = dayNumber(end);
+  if (today < start) return `${range} · starts ${dayShort(start)}`;
+  if (today > end) return `${range} · ended`;
+  return `${range} · day ${dayNumber(today)} of ${total}`;
+}
+
 function sumCounts(days: DayStats[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const d of days) for (const [k, v] of Object.entries(d.counts)) out[k] = (out[k] ?? 0) + v;
@@ -120,7 +136,11 @@ export function StatsPage() {
     return () => window.clearInterval(t);
   }, [refresh]);
 
-  const days = useMemo(() => combine(online.state === 'ok' ? online.kiosks : {}, self, local), [online, self, local]);
+  // Only the official event days (testing before the start is kept but not shown).
+  const days = useMemo(
+    () => combine(online.state === 'ok' ? online.kiosks : {}, self, local).filter((d) => d.day >= config.event.start && d.day <= config.event.end),
+    [online, self, local],
+  );
   // iPads that have counted at least one guest (empty uploads from stray browsers don't count).
   const others =
     online.state === 'ok'
@@ -136,47 +156,50 @@ export function StatsPage() {
   } else source = local.length ? 'This iPad only' : '';
 
   return (
-    <div className="st">
-      <header className="st-head">
-        <div>
-          <h1>Kiosk usage</h1>
-          <p className="st-sub">
-            LEGO® Santa’s Toy Factory{source && <> · {source}</>}
-          </p>
-        </div>
-        <div className="st-actions">
-          <button className="st-btn" onClick={() => void refresh()}>
-            Refresh
-          </button>
-          <button className="st-btn" onClick={() => downloadCsv(days)} disabled={!days.length}>
-            Download CSV
-          </button>
-          {self && (
-            <button className="st-btn st-btn-primary" onClick={() => location.assign('/')}>
-              Back to kiosk
+    <>
+      <header className="st-brand">
+        <div className="st-brand-in">
+          <img className="st-logo" src="/assets/lego-logo.png" alt="LEGO" width={56} height={56} />
+          <div className="st-titles">
+            <p className="st-kicker">LEGO® Santa’s Toy Factory</p>
+            <h1>Kiosk usage</h1>
+            {source && <p className="st-sub">{source}</p>}
+          </div>
+          <div className="st-actions">
+            <button className="st-btn" onClick={() => void refresh()}>
+              Refresh
             </button>
-          )}
+            <button className="st-btn" onClick={() => downloadCsv(days)} disabled={!days.length}>
+              Download CSV
+            </button>
+            {self && (
+              <button className="st-btn st-btn-primary" onClick={() => location.assign('/')}>
+                Back to kiosk
+              </button>
+            )}
+          </div>
         </div>
       </header>
-
-      {online.state === 'unavailable' && <p className="st-note">{online.reason}{local.length ? ' Showing this iPad’s own counts.' : ''}</p>}
-      {online.state === 'locked' && (
-        <KeyForm
-          wrong={online.wrong}
-          onSubmit={(k) => {
-            try {
-              localStorage.setItem(KEY_STORAGE, k);
-            } catch {
-              /* ignore */
-            }
-            setKey(k);
-          }}
-        />
-      )}
-      {(online.state !== 'loading' || local.length > 0) && !(online.state === 'locked' && !local.length) && (
-        <Dashboard days={days} selected={selected} onSelect={setSelected} />
-      )}
-    </div>
+      <div className="st">
+        {online.state === 'unavailable' && <p className="st-note">{online.reason}{local.length ? ' Showing this iPad’s own counts.' : ''}</p>}
+        {online.state === 'locked' && (
+          <KeyForm
+            wrong={online.wrong}
+            onSubmit={(k) => {
+              try {
+                localStorage.setItem(KEY_STORAGE, k);
+              } catch {
+                /* ignore */
+              }
+              setKey(k);
+            }}
+          />
+        )}
+        {(online.state !== 'loading' || local.length > 0) && !(online.state === 'locked' && !local.length) && (
+          <Dashboard days={days} selected={selected} onSelect={setSelected} />
+        )}
+      </div>
+    </>
   );
 }
 
@@ -214,7 +237,7 @@ function Dashboard({ days, selected, onSelect }: { days: DayStats[]; selected: s
     <>
       <section aria-label="Whole event">
         <h2 className="st-h2">
-          Whole event <span className="st-muted">· {days.length === 1 ? '1 day' : `${days.length} days`}</span>
+          Whole event <span className="st-muted">· {eventProgress()}</span>
         </h2>
         <div className="st-tiles">
           <Tile label="Guests" value={fmt(n(total, 'start'))} />

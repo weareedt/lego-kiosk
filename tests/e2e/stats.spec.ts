@@ -18,7 +18,7 @@ test('a guest is counted, and holding the Welcome corner opens the stats', async
   await page.waitForURL('**/stats', { timeout: 6_000 });
   await page.mouse.up();
 
-  await expect(page.locator('.st h1')).toHaveText('Kiosk usage');
+  await expect(page.locator('.st-brand h1')).toHaveText('Kiosk usage');
   const today = page.locator('.st-table tbody tr').first();
   // At least this guest (other tests running in parallel may upload to the same local store).
   await expect(today.locator('td').first()).toHaveText(/^[1-9]\d*$/); // started
