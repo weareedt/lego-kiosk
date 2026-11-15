@@ -2,16 +2,17 @@
  * Online copy of the kiosk usage counts, so /stats can be viewed from anywhere.
  *
  * Each iPad keeps its own per-day counts (src/lib/usage.ts) and every few
- * minutes uploads the whole set as one snapshot. That is one Redis command per
- * upload, so it barely touches a shared database's quota. /stats reads all
- * snapshots and adds them up, so a second iPad would just work.
+ * minutes uploads the whole set as one snapshot. /stats reads all snapshots and
+ * adds them up, so a second iPad would just work.
  *
- *   lego-kiosk:usage      hash: <kiosk id> → JSON { at, days }
+ *   /lego-kiosk-usage/<kiosk id>      { at, days }
  *
- * Storage is Upstash Redis over its REST API (no SDK). The same handlers run on
- * Vercel (api/usage.ts) and in the Vite dev/preview server (vite.config.ts),
- * which uses an in-memory store when Redis isn't configured.
+ * Storage is Firebase Realtime Database over its REST API (no SDK), signed in
+ * with a service account. The same handlers run on Vercel (api/usage.ts) and in
+ * the Vite dev/preview server (vite.config.ts), which uses an in-memory store
+ * when Firebase isn't configured.
  */
+import { createSign } from 'node:crypto';
 
 export type Counts = Record<string, number>;
 /** day (YYYY-MM-DD) → counts */
@@ -23,56 +24,131 @@ export interface KioskSnapshot {
   days: Days;
 }
 
-type Cmd = (string | number)[];
-
 export interface Store {
-  exec(cmds: Cmd[]): Promise<unknown[]>;
+  /** The kiosks that have a snapshot. */
+  ids(): Promise<string[]>;
+  /** Saves this kiosk's snapshot, replacing its previous one. */
+  put(kiosk: string, snap: KioskSnapshot): Promise<void>;
+  /** Every kiosk's snapshot as stored (not yet validated), by kiosk id. */
+  all(): Promise<Record<string, unknown>>;
 }
 
-const HASH = 'lego-kiosk:usage';
+export const ROOT = 'lego-kiosk-usage';
+/** The lego-kiosk Firebase project's database. FIREBASE_DATABASE_URL overrides it. */
+export const DATABASE_URL = 'https://lego-kiosk-default-rtdb.asia-southeast1.firebasedatabase.app';
 const MAX_BODY = 200_000;
 const MAX_KIOSKS = 20;
+/** How long one server instance reuses a read of all snapshots (/stats refreshes every minute, per viewer). */
+const READ_CACHE_MS = 30_000;
 
 // ---- Stores ---------------------------------------------------------------
 
-/** Upstash Redis REST, as provided by Vercel's Upstash integration. Null if not configured. */
-export function storeFromEnv(env: Record<string, string | undefined> = process.env): Store | null {
-  const url = env.KV_REST_API_URL ?? env.UPSTASH_REDIS_REST_URL;
-  const token = env.KV_REST_API_TOKEN ?? env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
+export interface ServiceAccount {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
+}
+
+/**
+ * Reads FIREBASE_SERVICE_ACCOUNT: the service account key file from the
+ * Firebase console, as JSON or base64 of that JSON. Null if unset or unusable.
+ */
+export function serviceAccountFromEnv(env: Record<string, string | undefined> = process.env): ServiceAccount | null {
+  const raw = env.FIREBASE_SERVICE_ACCOUNT?.trim();
+  if (!raw) return null;
+  try {
+    const key = JSON.parse(raw.startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8')) as Record<string, unknown>;
+    const { project_id: projectId, client_email: clientEmail, private_key: privateKey } = key;
+    if (typeof projectId !== 'string' || typeof clientEmail !== 'string' || typeof privateKey !== 'string') return null;
+    return { projectId, clientEmail, privateKey: privateKey.replace(/\\n/g, '\n') };
+  } catch {
+    return null;
+  }
+}
+
+const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const SCOPE = 'https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/userinfo.email';
+
+/** Google's service account sign-in: a signed JWT exchanged for an access token (good for an hour, reused). */
+function accessTokens(account: ServiceAccount): () => Promise<string> {
+  let current: { token: string; until: number } | null = null;
+  const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString('base64url');
+  return async () => {
+    if (current && Date.now() < current.until) return current.token;
+    const now = Math.floor(Date.now() / 1000);
+    const unsigned = `${b64({ alg: 'RS256', typ: 'JWT' })}.${b64({ iss: account.clientEmail, scope: SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600 })}`;
+    const assertion = `${unsigned}.${createSign('RSA-SHA256').update(unsigned).sign(account.privateKey, 'base64url')}`;
+    const res = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }),
+    });
+    const out = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error_description?: string };
+    if (!res.ok || !out.access_token) throw new Error(`Firebase sign-in ${res.status}${out.error_description ? `: ${out.error_description}` : ''}`);
+    current = { token: out.access_token, until: Date.now() + ((out.expires_in ?? 3600) - 300) * 1000 };
+    return current.token;
+  };
+}
+
+/** One call to the database: `path` is below the database root, without ".json". Returns the parsed JSON (null if nothing is there). */
+export type DbRequest = (method: 'GET' | 'PUT', path: string, body?: unknown) => Promise<unknown>;
+
+/** Realtime Database REST, signed in as the service account. */
+export function firebaseRequest(account: ServiceAccount, databaseUrl: string): DbRequest {
+  const token = accessTokens(account);
+  const base = databaseUrl.replace(/\/+$/, '');
+  return async (method, path, body) => {
+    const [name, query] = path.split('?');
+    const res = await fetch(`${base}/${name}.json${query ? `?${query}` : ''}`, {
+      method,
+      headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Firebase ${res.status}`);
+    return res.json();
+  };
+}
+
+/** One child per kiosk under ROOT. */
+export function firebaseStore(request: DbRequest): Store {
+  let cached: { at: number; kiosks: Record<string, unknown> } | null = null;
   return {
-    async exec(cmds) {
-      const res = await fetch(`${url.replace(/\/+$/, '')}/pipeline`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(cmds),
-      });
-      if (!res.ok) throw new Error(`Redis ${res.status}`);
-      const out = (await res.json()) as { result?: unknown; error?: string }[];
-      const err = out.find((r) => r.error);
-      if (err) throw new Error(`Redis: ${err.error}`);
-      return out.map((r) => r.result);
+    // shallow: just the kiosk ids, not their counts
+    ids: async () => Object.keys(((await request('GET', `${ROOT}?shallow=true`)) as object | null) ?? {}),
+    async put(kiosk, snap) {
+      await request('PUT', `${ROOT}/${kiosk}`, { at: snap.at, days: snap.days });
+      cached = null;
+    },
+    async all() {
+      if (cached && Date.now() - cached.at < READ_CACHE_MS) return cached.kiosks;
+      const kiosks: Record<string, unknown> = {};
+      for (const [id, snap] of Object.entries(((await request('GET', ROOT)) as object | null) ?? {})) {
+        // The database doesn't keep empty objects: an iPad with no days yet comes back without `days`.
+        kiosks[id] = snap && typeof snap === 'object' ? { days: {}, ...snap } : snap;
+      }
+      cached = { at: Date.now(), kiosks };
+      return kiosks;
     },
   };
 }
 
-/** In-memory store for local dev and tests (HSET, HGETALL, HLEN only). */
+let fromEnv: Store | null = null;
+
+/** Firebase, using the FIREBASE_SERVICE_ACCOUNT key. Null if not configured. */
+export function storeFromEnv(env: Record<string, string | undefined> = process.env): Store | null {
+  const account = serviceAccountFromEnv(env);
+  if (!account) return null;
+  return (fromEnv ??= firebaseStore(firebaseRequest(account, env.FIREBASE_DATABASE_URL?.trim() || DATABASE_URL)));
+}
+
+/** In-memory store for local dev and tests. */
 export function memoryStore(): Store {
-  const hashes = new Map<string, Map<string, string>>();
-  const get = (k: string) => hashes.get(k) ?? hashes.set(k, new Map()).get(k)!;
-  const run = ([cmd, key, ...args]: Cmd): unknown => {
-    const h = get(String(key));
-    if (cmd === 'HSET') {
-      const isNew = !h.has(String(args[0]));
-      h.set(String(args[0]), String(args[1]));
-      return isNew ? 1 : 0;
-    }
-    if (cmd === 'HGETALL') return [...h].flat();
-    if (cmd === 'HLEN') return h.size;
-    if (cmd === 'HEXISTS') return h.has(String(args[0])) ? 1 : 0;
-    throw new Error(`memoryStore: unsupported ${cmd}`);
+  const kiosks = new Map<string, KioskSnapshot>();
+  return {
+    ids: async () => [...kiosks.keys()],
+    put: async (kiosk, snap) => void kiosks.set(kiosk, snap),
+    all: async () => Object.fromEntries(kiosks),
   };
-  return { exec: async (cmds) => cmds.map(run) };
 }
 
 // ---- Validation -----------------------------------------------------------
@@ -131,13 +207,10 @@ export async function handleUsage(req: Request, store: Store | null, statsKey?: 
     const days = cleanDays(body.days);
     if (typeof body.kiosk !== 'string' || !KIOSK_RE.test(body.kiosk) || !days) return json({ error: 'bad_body' }, 400);
     try {
-      const [exists, count] = await store.exec([
-        ['HEXISTS', HASH, body.kiosk],
-        ['HLEN', HASH],
-      ]);
-      if (!exists && Number(count) >= MAX_KIOSKS) return json({ error: 'too_many_kiosks' }, 409);
+      const ids = await store.ids();
+      if (!ids.includes(body.kiosk) && ids.length >= MAX_KIOSKS) return json({ error: 'too_many_kiosks' }, 409);
       const snap: KioskSnapshot = { at: new Date().toISOString(), days };
-      await store.exec([['HSET', HASH, body.kiosk, JSON.stringify(snap)]]);
+      await store.put(body.kiosk, snap);
       return json({ ok: true, at: snap.at });
     } catch (err) {
       return json({ error: 'store', detail: String(err) }, 502);
@@ -151,16 +224,11 @@ export async function handleUsage(req: Request, store: Store | null, statsKey?: 
     }
     if (!store) return json({ error: 'not_configured' }, 503);
     try {
-      const [flat] = (await store.exec([['HGETALL', HASH]])) as string[][];
       const kiosks: Record<string, KioskSnapshot> = {};
-      for (let i = 0; i + 1 < (flat ?? []).length; i += 2) {
-        try {
-          const s = JSON.parse(flat[i + 1]) as KioskSnapshot;
-          const days = cleanDays(s.days);
-          if (days) kiosks[flat[i]] = { at: String(s.at), days };
-        } catch {
-          /* skip a bad entry */
-        }
+      for (const [id, raw] of Object.entries(await store.all())) {
+        const s = raw as Partial<KioskSnapshot> | null;
+        const days = cleanDays(s?.days);
+        if (days) kiosks[id] = { at: String(s?.at), days };
       }
       return json({ kiosks, at: new Date().toISOString() });
     } catch (err) {

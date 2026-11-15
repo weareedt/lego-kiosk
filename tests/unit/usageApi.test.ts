@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanDays, handleUsage, memoryStore, mergeDays } from '../../server/usage';
+import { ROOT, cleanDays, firebaseStore, handleUsage, memoryStore, mergeDays, serviceAccountFromEnv, storeFromEnv, type DbRequest } from '../../server/usage';
 
 const post = (body: unknown) => new Request('http://x/api/usage', { method: 'POST', body: JSON.stringify(body) });
 const get = (init?: RequestInit, q = '') => new Request(`http://x/api/usage${q}`, init);
@@ -54,5 +54,78 @@ describe('/api/usage', () => {
     expect((await handleUsage(get(), store, 'secret')).status).toBe(401);
     expect((await handleUsage(get(undefined, '?key=secret'), store, 'secret')).status).toBe(200);
     expect((await handleUsage(get({ headers: { 'x-stats-key': 'secret' } }), store, 'secret')).status).toBe(200);
+  });
+});
+
+/**
+ * Stands in for the Realtime Database REST API: just the calls the store makes.
+ * Like the real one, it doesn't keep empty objects. Counts reads of everything.
+ */
+function fakeDb() {
+  const kiosks = new Map<string, Record<string, unknown>>();
+  const reads = { all: 0 };
+  const request: DbRequest = async (method, path, body) => {
+    if (method === 'GET' && path === `${ROOT}?shallow=true`) return kiosks.size ? Object.fromEntries([...kiosks.keys()].map((k) => [k, true])) : null;
+    if (method === 'GET' && path === ROOT) return reads.all++, kiosks.size ? Object.fromEntries(kiosks) : null;
+    if (method === 'PUT' && path.startsWith(`${ROOT}/`)) {
+      const kept = Object.entries(body as object).filter(([, v]) => !(v && typeof v === 'object' && !Object.keys(v).length));
+      kiosks.set(path.slice(ROOT.length + 1), structuredClone(Object.fromEntries(kept)));
+      return body;
+    }
+    throw new Error(`fakeDb: unexpected ${method} ${path}`);
+  };
+  return { request, kiosks, reads };
+}
+
+describe('Firebase store', () => {
+  it('keeps one entry per iPad and serves them through /api/usage', async () => {
+    const { request, kiosks } = fakeDb();
+    const store = firebaseStore(request);
+    expect((await (await handleUsage(get(), store)).json()).kiosks).toEqual({}); // empty database
+    await handleUsage(post({ kiosk: 'ipad-aaaa', days: { '2026-12-05': { start: 1 } } }), store);
+    await handleUsage(post({ kiosk: 'ipad-aaaa', days: { '2026-12-05': { start: 4, 'start@14': 4, 'char:yeti': 2 } } }), store);
+    await handleUsage(post({ kiosk: 'ipad-bbbb', days: {} }), store);
+    expect([...kiosks.keys()]).toEqual(['ipad-aaaa', 'ipad-bbbb']);
+    expect(kiosks.get('ipad-aaaa')).toEqual({ at: expect.any(String), days: { '2026-12-05': { start: 4, 'start@14': 4, 'char:yeti': 2 } } });
+    const body = await (await handleUsage(get(), store)).json();
+    expect(body.kiosks['ipad-aaaa'].days['2026-12-05'].start).toBe(4);
+    expect(body.kiosks['ipad-bbbb'].days).toEqual({}); // an iPad with no days yet is still listed
+  });
+
+  it('reuses a read for a moment, but never past an upload', async () => {
+    const { request, reads } = fakeDb();
+    const store = firebaseStore(request);
+    await store.put('ipad-aaaa', { at: 'a', days: {} });
+    await store.all();
+    await store.all();
+    expect(reads.all).toBe(1);
+    await store.put('ipad-bbbb', { at: 'b', days: {} });
+    expect(Object.keys(await store.all())).toEqual(['ipad-aaaa', 'ipad-bbbb']);
+    expect(reads.all).toBe(2);
+  });
+
+  it('stops registering iPads at the limit, but existing ones keep uploading', async () => {
+    const { request, kiosks } = fakeDb();
+    const store = firebaseStore(request);
+    for (let i = 0; i < 20; i++) kiosks.set(`ipad-${1000 + i}`, { at: 'x' });
+    expect((await handleUsage(post({ kiosk: 'ipad-new1', days: {} }), store)).status).toBe(409);
+    expect((await handleUsage(post({ kiosk: 'ipad-1000', days: {} }), store)).status).toBe(200);
+  });
+
+  it('answers 502 when Firebase can’t be reached', async () => {
+    const store = firebaseStore(() => Promise.reject(new Error('offline')));
+    expect((await handleUsage(post({ kiosk: 'ipad-aaaa', days: {} }), store)).status).toBe(502);
+    expect((await handleUsage(get(), store)).status).toBe(502);
+  });
+
+  it('reads the service account key as JSON or base64, and is off without one', () => {
+    const key = JSON.stringify({ project_id: 'demo', client_email: 'a@demo.iam.gserviceaccount.com', private_key: 'line1\\nline2' });
+    const want = { projectId: 'demo', clientEmail: 'a@demo.iam.gserviceaccount.com', privateKey: 'line1\nline2' };
+    expect(serviceAccountFromEnv({ FIREBASE_SERVICE_ACCOUNT: key })).toEqual(want);
+    expect(serviceAccountFromEnv({ FIREBASE_SERVICE_ACCOUNT: Buffer.from(key).toString('base64') })).toEqual(want);
+    expect(serviceAccountFromEnv({ FIREBASE_SERVICE_ACCOUNT: '{"project_id":"demo"}' })).toBeNull();
+    expect(serviceAccountFromEnv({ FIREBASE_SERVICE_ACCOUNT: 'not a key' })).toBeNull();
+    expect(serviceAccountFromEnv({})).toBeNull();
+    expect(storeFromEnv({})).toBeNull();
   });
 });
