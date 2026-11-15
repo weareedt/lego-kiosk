@@ -79,14 +79,37 @@ on the next upload. A second iPad would show up and be added in automatically.
 seconds**. The stats open in the app (works under Guided Access) with that iPad’s
 live counts and a **Back to kiosk** button. A normal tap there starts as usual.
 
-**Storage:** Upstash Redis via Vercel. This project shares the team’s
-`fugglers-redis` database: everything is under one key, `lego-kiosk:usage`, and
-each upload is a single command (a few hundred a day at most), so it doesn’t
-affect Fugglers. To set up again: in Vercel, **Storage → Connect Database →
-fugglers-redis → lego-kiosk**, keep the default env var prefix
-(`KV_REST_API_URL` / `KV_REST_API_TOKEN`), then redeploy. Optional: set
-`STATS_KEY` to make `/stats` ask for a key. Locally, `npm run dev` / `npm run
-preview` serve the same API from memory.
+**Storage:** Firebase Realtime Database in the `lego-kiosk` Firebase project,
+one entry per iPad under `/lego-kiosk-usage/<kiosk id>` (`{ at, days }`). Only
+`/api/usage` talks to it, over the REST API with a service account, so the
+database’s rules stay closed (`".read": false, ".write": false`). To set up
+again:
+
+1. In the [Firebase console](https://console.firebase.google.com), open the
+   project and **Build → Realtime Database → Create database** (locked mode).
+   For a different project or database, set `FIREBASE_DATABASE_URL` to its URL.
+2. **Project settings → Service accounts → Generate new private key.** Keep the
+   downloaded JSON file private; never commit it.
+3. In Vercel, **Settings → Environment Variables**, add
+   `FIREBASE_SERVICE_ACCOUNT` with the whole contents of that file (or base64 of
+   it), then redeploy.
+
+Optional: set `STATS_KEY` to make `/stats` ask for a key. Locally, `npm run dev` /
+`npm run preview` serve the same API from memory. An upload is two small
+requests; a `/stats` refresh downloads every iPad’s counts (reused for 30
+seconds), which stays well inside the free Spark plan’s 10 GB a month.
+
+**Moving from the old Redis database:** `scripts/migrate-usage-to-firebase.mjs`
+copies every iPad’s snapshot across and never replaces a newer one, so it can be
+run more than once (Node 22.18+):
+
+```bash
+node scripts/migrate-usage-to-firebase.mjs backups/usage.json --key ~/key.json --dry-run
+```
+
+The source is a JSON file saved from `/api/usage`, the URL of a deployment still
+on Redis, or Redis itself (`KV_REST_API_URL` / `KV_REST_API_TOKEN`). Each iPad
+also uploads its whole history the next time it counts a guest.
 
 ## Tests
 
@@ -110,7 +133,7 @@ opening the usage stats, and the iPad’s upload reaching `/stats` elsewhere.
 
 Import the repo in Vercel. The framework preset is Vite (build `npm run build`,
 output `dist`). `vercel.json` rewrites every route except `/api/*` to the app; `api/usage.ts`
-serves the usage stats (see *Usage stats* for the Redis setup).
+serves the usage stats (see *Usage stats* for the Firebase setup).
 `VITE_QR_BASE_URL` is optional.
 
 ## iPad kiosk setup

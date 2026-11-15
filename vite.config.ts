@@ -4,8 +4,8 @@ import { handleUsage, memoryStore, storeFromEnv } from './server/usage';
 
 /**
  * Serves /api/usage in `vite dev` and `vite preview`, so the usage sync and
- * /stats work locally. Uses Upstash Redis if its env vars are set, otherwise an
- * in-memory store. On Vercel the same handler runs as api/usage.ts.
+ * /stats work locally. Uses Firebase if FIREBASE_SERVICE_ACCOUNT is set, otherwise
+ * an in-memory store. On Vercel the same handler runs as api/usage.ts.
  */
 function usageApi(): Plugin {
   const store = storeFromEnv() ?? memoryStore();
