@@ -3,6 +3,14 @@ export const config = {
   /** Design canvas: iPad mini portrait in CSS points. The stage is scaled to fit any screen. */
   stage: { width: 744, height: 1133 },
 
+  /**
+   * How far the Welcome artwork (welcome.jpg, same size as the canvas) may be enlarged to
+   * fill a wider screen. cropTop / cropBottom: rows of the artwork that hold nothing that
+   * must be seen (the title plate starts at 93, the black tag ends at 1109). maxStretch:
+   * widening allowed on top of that, small enough not to be noticed.
+   */
+  welcomeArt: { cropTop: 96, cropBottom: 14, maxStretch: 1.035 },
+
   maxNameLength: 12,
   /** Used when the guest skips the name step. */
   fallbackName: 'Festive Friend',
