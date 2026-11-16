@@ -18,10 +18,22 @@ export type Counts = Record<string, number>;
 /** day (YYYY-MM-DD) → counts */
 export type Days = Record<string, Counts>;
 
+/** What the iPad's screen is like. Sent with the counts; nothing in it identifies a person. */
+export interface KioskDevice {
+  /** The device's screen in CSS points, [width, height]. */
+  screen: [number, number];
+  /** The space the app has, [width, height]: smaller than the screen when Safari's bars show. */
+  view: [number, number];
+  /** Opened from the Home Screen icon (full screen) rather than in a Safari tab. */
+  standalone: boolean;
+}
+
 export interface KioskSnapshot {
   /** When the iPad sent it (ISO time). */
   at: string;
   days: Days;
+  /** Missing for uploads from before the app reported it. */
+  device?: KioskDevice;
 }
 
 export interface Store {
@@ -184,21 +196,32 @@ export function mergeDays(snapshots: Days[]): Days {
   return out;
 }
 
+/** A valid device description, or null (it is optional, so a bad one is just left out). */
+export function cleanDevice(raw: unknown): KioskDevice | null {
+  const size = (v: unknown): [number, number] | null =>
+    Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n > 0 && n <= 20_000) ? [v[0], v[1]] : null;
+  if (!raw || typeof raw !== 'object') return null;
+  const d = raw as Record<string, unknown>;
+  const screen = size(d.screen);
+  const view = size(d.view);
+  return screen && view ? { screen, view, standalone: d.standalone === true } : null;
+}
+
 // ---- HTTP handler (Web Request/Response) ----------------------------------
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
 /**
- * POST /api/usage  { kiosk, days }  stores this iPad's snapshot.
- * GET  /api/usage  → { kiosks: { <id>: { at, days } }, at }  (needs ?key= or x-stats-key when STATS_KEY is set)
+ * POST /api/usage  { kiosk, days, device? }  stores this iPad's snapshot.
+ * GET  /api/usage  → { kiosks: { <id>: { at, days, device? } }, at }  (needs ?key= or x-stats-key when STATS_KEY is set)
  */
 export async function handleUsage(req: Request, store: Store | null, statsKey?: string): Promise<Response> {
   if (req.method === 'POST') {
     if (!store) return json({ error: 'not_configured' }, 503);
     const text = await req.text();
     if (text.length > MAX_BODY) return json({ error: 'too_large' }, 413);
-    let body: { kiosk?: unknown; days?: unknown };
+    let body: { kiosk?: unknown; days?: unknown; device?: unknown };
     try {
       body = JSON.parse(text);
     } catch {
@@ -209,7 +232,8 @@ export async function handleUsage(req: Request, store: Store | null, statsKey?: 
     try {
       const ids = await store.ids();
       if (!ids.includes(body.kiosk) && ids.length >= MAX_KIOSKS) return json({ error: 'too_many_kiosks' }, 409);
-      const snap: KioskSnapshot = { at: new Date().toISOString(), days };
+      const device = cleanDevice(body.device);
+      const snap: KioskSnapshot = { at: new Date().toISOString(), days, ...(device && { device }) };
       await store.put(body.kiosk, snap);
       return json({ ok: true, at: snap.at });
     } catch (err) {
@@ -228,7 +252,8 @@ export async function handleUsage(req: Request, store: Store | null, statsKey?: 
       for (const [id, raw] of Object.entries(await store.all())) {
         const s = raw as Partial<KioskSnapshot> | null;
         const days = cleanDays(s?.days);
-        if (days) kiosks[id] = { at: String(s?.at), days };
+        const device = cleanDevice(s?.device);
+        if (days) kiosks[id] = { at: String(s?.at), days, ...(device && { device }) };
       }
       return json({ kiosks, at: new Date().toISOString() });
     } catch (err) {

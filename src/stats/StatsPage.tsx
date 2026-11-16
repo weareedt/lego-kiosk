@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CHARACTERS, CHARACTER_IDS } from '../lib/characters';
 import { config } from '../lib/config';
+import { ipadName } from '../lib/ipadModel';
 import { kioskId, loadUsage, localDay, type DayStats } from '../lib/usage';
 import './stats.css';
 
@@ -15,6 +16,8 @@ type Days = Record<string, Record<string, number>>;
 interface Snapshot {
   at: string;
   days: Days;
+  /** The iPad's screen, once it runs a version of the app that reports it. */
+  device?: { screen: [number, number]; view: [number, number]; standalone: boolean };
 }
 
 type Online =
@@ -198,8 +201,62 @@ export function StatsPage() {
         {(online.state !== 'loading' || local.length > 0) && !(online.state === 'locked' && !local.length) && (
           <Dashboard days={days} selected={selected} onSelect={setSelected} />
         )}
+        {online.state === 'ok' && <Ipads kiosks={online.kiosks} self={self} />}
       </div>
     </>
+  );
+}
+
+/** Every iPad that has counted a guest: when it last uploaded, its screen and how it is opened. */
+function Ipads({ kiosks, self }: { kiosks: Record<string, Snapshot>; self: string | null }) {
+  const today = localDay(new Date());
+  const rows = Object.entries(kiosks)
+    .filter(([, s]) => Object.keys(s.days).length > 0)
+    .sort(([, a], [, b]) => (a.at < b.at ? 1 : -1));
+  if (!rows.length) return null;
+  const size = ([w, h]: [number, number]) => `${w} × ${h}`;
+  return (
+    <section className="st-card">
+      <h3 className="st-h3">iPads</h3>
+      <p className="st-hint">Screen sizes are in points. An iPad reports its screen after it has reloaded the app and counted a guest.</p>
+      <div className="st-table-wrap">
+        <table className="st-table st-ipads">
+          <thead>
+            <tr>
+              <th scope="col">iPad</th>
+              <th scope="col">Last upload</th>
+              <th scope="col">Screen</th>
+              <th scope="col">Opened as</th>
+              <th scope="col" className="st-num">Guests today</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([id, s]) => {
+              const d = s.device;
+              const name = d && ipadName(d.screen);
+              return (
+                <tr key={id}>
+                  <th scope="row">
+                    {id}
+                    {id === self && <span className="st-muted"> · this iPad</span>}
+                  </th>
+                  <td>{ago(s.at)}</td>
+                  <td>
+                    {d ? size(d.screen) : <span className="st-muted">not reported yet</span>}
+                    {name && <span className="st-muted"> · {name}</span>}
+                  </td>
+                  <td>
+                    {d && (d.standalone ? 'Home Screen app' : 'Browser tab')}
+                    {d && !d.standalone && <span className="st-muted"> · {size(d.view)} visible</span>}
+                  </td>
+                  <td className="st-num">{fmt(n(s.days[today] ?? {}, 'start'))}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

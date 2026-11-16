@@ -69,6 +69,11 @@ character, and how often the camera error screen came up. Days and hours are the
 iPad’s local time. Only counts are kept (`src/lib/usage.ts`): no names or photos.
 QR scans happen on guests’ phones, so they aren’t counted.
 
+With its counts each iPad also sends its screen size and whether it was opened from
+the Home Screen or in a browser tab. The **iPads** table at the bottom of `/stats`
+lists every iPad with its last upload, screen and guests today. An iPad shows “not
+reported yet” until it has reloaded the app and counted a guest.
+
 **From anywhere:** open **`/stats`** on the deployment (laptop or phone). Every 3
 minutes, if anything changed, the iPad uploads its whole set of counts as one
 snapshot to `/api/usage` (`server/usage.ts`), so the numbers are at most a few
@@ -80,7 +85,7 @@ seconds**. The stats open in the app (works under Guided Access) with that iPad�
 live counts and a **Back to kiosk** button. A normal tap there starts as usual.
 
 **Storage:** Firebase Realtime Database in the `lego-kiosk` Firebase project,
-one entry per iPad under `/lego-kiosk-usage/<kiosk id>` (`{ at, days }`). Only
+one entry per iPad under `/lego-kiosk-usage/<kiosk id>` (`{ at, days, device }`). Only
 `/api/usage` talks to it, over the REST API with a service account, so the
 database’s rules stay closed (`".read": false, ".write": false`). To set up
 again:
@@ -152,8 +157,10 @@ The UI is designed on a 744 × 1133 canvas (iPad mini portrait). `Stage.tsx` sca
 it to fit any screen. On an iPad of another shape the canvas stays centred and the
 background and sign bar run to the screen edges, so there are no bars at the sides
 (`src/lib/stageFit.ts`). The Welcome artwork is enlarged to fill a wider screen: it
-is cropped only within the margins set in `config.welcomeArt` (so the title and the
-logos always stay in view), then widened by at most 3.5%.
+is cropped only within the margins set in `config.welcomeArt` (so the title, with
+room above it, and the logos always stay in view), then widened by at most 3.5%. On
+3:4 iPads that leaves a strip of about 1% either side, where the artwork fades into
+the blurred background.
 
 ## Project structure
 

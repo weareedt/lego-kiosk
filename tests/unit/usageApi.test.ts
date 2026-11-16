@@ -35,6 +35,22 @@ describe('/api/usage', () => {
     expect(typeof body.kiosks['ipad-aaaa'].at).toBe('string');
   });
 
+  it('keeps the iPad’s screen size when it is sent, and ignores a malformed one', async () => {
+    const store = memoryStore();
+    const days = { '2026-12-05': { start: 1 } };
+    const device = { screen: [1024, 1366], view: [1024, 1292], standalone: false };
+    await handleUsage(post({ kiosk: 'ipad-aaaa', days, device: { ...device, extra: 'dropped' } }), store);
+    await handleUsage(post({ kiosk: 'ipad-bbbb', days }), store); // an iPad still on the old version
+    expect((await handleUsage(post({ kiosk: 'ipad-cccc', days, device: { screen: ['wide', 2], view: [1, 2] } }), store)).status).toBe(200);
+    expect((await handleUsage(post({ kiosk: 'ipad-dddd', days, device: { screen: [744, 1133], view: [744, 1133], standalone: true } }), store)).status).toBe(200);
+    const { kiosks } = await (await handleUsage(get(), store)).json();
+    expect(kiosks['ipad-aaaa'].device).toEqual(device);
+    expect(kiosks['ipad-bbbb']).not.toHaveProperty('device');
+    expect(kiosks['ipad-cccc']).not.toHaveProperty('device');
+    expect(kiosks['ipad-cccc'].days).toEqual(days);
+    expect(kiosks['ipad-dddd'].device.standalone).toBe(true);
+  });
+
   it('rejects bad uploads', async () => {
     const store = memoryStore();
     expect((await handleUsage(post({ kiosk: 'x', days: {} }), store)).status).toBe(400);
