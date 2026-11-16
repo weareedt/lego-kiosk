@@ -1,5 +1,10 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { fitStage } from '../lib/stageFit';
+import { createContext, useContext, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { fitStage, type StageFit } from '../lib/stageFit';
+
+const FitContext = createContext<StageFit>(fitStage(0, 0));
+
+/** The current fit of the canvas to the screen, for screens that lay themselves out by it. */
+export const useStageFit = () => useContext(FitContext);
 
 /**
  * Scales the 744×1133 design canvas to fit the screen, keeping its aspect ratio. On a screen
@@ -24,7 +29,7 @@ export function Stage({ children }: { children: ReactNode }) {
   return (
     <div className="viewport">
       <div className="stage" style={style}>
-        {children}
+        <FitContext.Provider value={fit}>{children}</FitContext.Provider>
       </div>
     </div>
   );

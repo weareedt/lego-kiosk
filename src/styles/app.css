@@ -43,8 +43,10 @@ button:disabled { cursor: default; }
 .screen-countdown .lt { transition: background .15s, color .15s; }
 
 
-/* Welcome is a full-screen button */
+/* Welcome is a full-screen button. .art-fill holds the artwork and the button highlight, and is
+   enlarged from the top centre to fill a wider screen (see Welcome.tsx). */
 .screen-welcome.scr { padding: 0; }
+.screen-welcome .art-fill { position: absolute; left: 0; top: 0; width: 744px; height: 1133px; display: block; transform-origin: 50% 0; }
 
 /* "Still building?" idle prompt */
 .idle { position: absolute; inset: 0; z-index: 50; background: rgba(20,12,6,.45); display: flex; align-items: flex-end; justify-content: center; animation: screenIn .25s ease-out both; }
