@@ -156,11 +156,8 @@ icon (step 1): a page cannot hide it when the URL is opened in a Safari tab.
 The UI is designed on a 744 × 1133 canvas (iPad mini portrait). `Stage.tsx` scales
 it to fit any screen. On an iPad of another shape the canvas stays centred and the
 background and sign bar run to the screen edges, so there are no bars at the sides
-(`src/lib/stageFit.ts`). The Welcome artwork is enlarged to fill a wider screen: it
-is cropped only within the margins set in `config.welcomeArt` (so the title, with
-room above it, and the logos always stay in view), then widened by at most 3.5%. On
-3:4 iPads that leaves a strip of about 1% either side, where the artwork fades into
-the blurred background.
+(`src/lib/stageFit.ts`). The Welcome artwork is always shown whole at the canvas
+size; on a wider screen the blurred background fills the space either side of it.
 
 ## Project structure
 

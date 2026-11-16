@@ -43,11 +43,11 @@ button:disabled { cursor: default; }
 .screen-countdown .lt { transition: background .15s, color .15s; }
 
 
-/* Welcome is a full-screen button. .art-fill holds the artwork and the button highlight, and is
-   enlarged from the top centre to fill a wider screen (see Welcome.tsx). */
+/* Welcome is a full-screen button. .art-box holds the artwork and the button highlight; on a
+   wider screen the blurred background (.bg) shows either side and the artwork's edges fade
+   into it. 6px is the gap between the artwork's edge and the LEGO logo, so the logo is never faded. */
 .screen-welcome.scr { padding: 0; }
-.screen-welcome .art-fill { position: absolute; left: 0; top: 0; width: 744px; height: 1133px; display: block; transform-origin: 50% 0; }
-/* 6px is the gap between the artwork's edge and the LEGO logo, so the logo is never faded. */
+.screen-welcome .art-box { position: absolute; left: 0; top: 0; width: 744px; height: 1133px; display: block; }
 .screen-welcome .art-soft { -webkit-mask-image: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 6px), transparent); mask-image: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 6px), transparent); }
 
 /* "Still building?" idle prompt */
