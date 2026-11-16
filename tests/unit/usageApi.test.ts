@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ROOT, cleanDays, firebaseStore, handleUsage, memoryStore, mergeDays, serviceAccountFromEnv, storeFromEnv, type DbRequest } from '../../server/usage';
+import { MAX_KIOSKS, ROOT, cleanDays, firebaseStore, handleUsage, memoryStore, mergeDays, serviceAccountFromEnv, storeFromEnv, type DbRequest } from '../../server/usage';
 
 const post = (body: unknown) => new Request('http://x/api/usage', { method: 'POST', body: JSON.stringify(body) });
 const get = (init?: RequestInit, q = '') => new Request(`http://x/api/usage${q}`, init);
@@ -123,7 +123,8 @@ describe('Firebase store', () => {
   it('stops registering iPads at the limit, but existing ones keep uploading', async () => {
     const { request, kiosks } = fakeDb();
     const store = firebaseStore(request);
-    for (let i = 0; i < 20; i++) kiosks.set(`ipad-${1000 + i}`, { at: 'x' });
+    for (let i = 0; i < MAX_KIOSKS - 1; i++) kiosks.set(`ipad-${1000 + i}`, { at: 'x' });
+    expect((await handleUsage(post({ kiosk: 'ipad-last', days: {} }), store)).status).toBe(200); // the last free place
     expect((await handleUsage(post({ kiosk: 'ipad-new1', days: {} }), store)).status).toBe(409);
     expect((await handleUsage(post({ kiosk: 'ipad-1000', days: {} }), store)).status).toBe(200);
   });

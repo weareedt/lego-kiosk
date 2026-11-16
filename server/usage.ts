@@ -49,7 +49,12 @@ export const ROOT = 'lego-kiosk-usage';
 /** The lego-kiosk Firebase project's database. FIREBASE_DATABASE_URL overrides it. */
 export const DATABASE_URL = 'https://lego-kiosk-default-rtdb.asia-southeast1.firebasedatabase.app';
 const MAX_BODY = 200_000;
-const MAX_KIOSKS = 20;
+/**
+ * Most entries the store will hold: a guard against junk, not a count of real iPads. An iPad
+ * gets a new entry whenever it is added to the Home Screen or opened in another browser, so
+ * this has to leave room for that. Existing entries can always upload.
+ */
+export const MAX_KIOSKS = 50;
 /** How long one server instance reuses a read of all snapshots (/stats refreshes every minute, per viewer). */
 const READ_CACHE_MS = 30_000;
 
