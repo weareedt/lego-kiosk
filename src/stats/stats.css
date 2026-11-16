@@ -158,6 +158,10 @@ body.is-stats #root { height: auto; min-height: 100%; }
 .st-table thead th { font-size: 12px; color: var(--st-text-2); font-weight: 700; vertical-align: bottom; white-space: normal; min-width: 64px; }
 .st-table th[scope="row"], .st-table thead th:first-child { text-align: left; }
 .st-table tfoot th, .st-table tfoot td { font-weight: 800; border-bottom: 0; }
+/* iPads: mostly text, so left-aligned; only the count is a number column */
+.st-ipads th, .st-ipads td { text-align: left; }
+.st-ipads .st-num { text-align: right; }
+.st-ipads tbody tr:last-child th, .st-ipads tbody tr:last-child td { border-bottom: 0; }
 
 
 @media (max-width: 520px) {

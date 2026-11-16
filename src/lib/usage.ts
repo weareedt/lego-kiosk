@@ -62,7 +62,7 @@ export function loadUsage(): DayStats[] {
 // ---- Online copy ------------------------------------------------------------
 // Every few minutes the iPad uploads its whole set of counts to /api/usage, so
 // /stats can be opened from anywhere (see server/usage.ts). One small request,
-// only when something changed. Offline: it just tries again next time.
+// only when the counts changed. Its screen size goes along with them. Offline: it just tries again next time.
 
 const KIOSK_KEY = 'stf.kioskId';
 const SYNCED_KEY = 'stf.usageSynced';
@@ -87,6 +87,25 @@ export function kioskId(create = true): string | null {
   }
 }
 
+/**
+ * This iPad's screen, sent with the counts so /stats can show which iPads are in use and
+ * whether each runs full screen. Sizes are in CSS points; nothing here identifies a person.
+ */
+export function deviceInfo(): { screen: [number, number]; view: [number, number]; standalone: boolean } | undefined {
+  try {
+    const standalone =
+      (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+      window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+    return {
+      screen: [Math.round(window.screen.width), Math.round(window.screen.height)],
+      view: [Math.round(window.innerWidth), Math.round(window.innerHeight)],
+      standalone,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 let syncing = false;
 
 /** Upload this iPad's counts if they changed since the last successful upload. */
@@ -105,7 +124,7 @@ export async function syncUsage(): Promise<void> {
     const res = await fetch(SYNC_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kiosk: kioskId(), days: JSON.parse(raw) }),
+      body: JSON.stringify({ kiosk: kioskId(), days: JSON.parse(raw), device: deviceInfo() }),
     });
     if (res.ok) localStorage.setItem(SYNCED_KEY, raw);
   } catch {
