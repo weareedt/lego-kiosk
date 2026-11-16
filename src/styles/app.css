@@ -15,10 +15,16 @@ img { -webkit-user-drag: none; }
 button { border: 0; padding: 0; margin: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: inherit; }
 button:disabled { cursor: default; }
 
-/* The 744×1133 design canvas, scaled to fit the screen (see Stage.tsx). */
+/* The 744×1133 design canvas, scaled to fit the screen (see Stage.tsx). On a screen of another
+   shape the stage is larger than the canvas by --bleed-x / --bleed-y on each side: the canvas
+   (.scr-wrap) stays in the middle and backgrounds run into the bleed, so there are no bars. */
 .viewport { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-.stage { width: 744px; height: 1133px; position: relative; flex: none; transform-origin: center center; overflow: hidden; }
-.scr-wrap { position: absolute; inset: 0; }
+.stage { --bleed-x: 0px; --bleed-y: 0px; width: 744px; height: 1133px; position: relative; flex: none; transform-origin: center center; overflow: hidden; background: #D9A21C; }
+.scr-wrap { position: absolute; left: var(--bleed-x); top: var(--bleed-y); width: 744px; height: 1133px; }
+/* The stage clips, not the screen, so these can reach the screen edge. */
+.stage .scr-wrap .scr { overflow: visible; }
+.stage .bg { inset: calc(-1 * var(--bleed-y)) calc(-1 * var(--bleed-x)); width: calc(100% + 2 * var(--bleed-x)); height: calc(100% + 2 * var(--bleed-y)); }
+.stage .bar { left: calc(-1 * var(--bleed-x)); right: calc(-1 * var(--bleed-x)); }
 .screen-enter { animation: screenIn .28s ease-out both; }
 @keyframes screenIn { from { opacity: 0; } to { opacity: 1; } }
 

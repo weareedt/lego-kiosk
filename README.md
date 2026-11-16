@@ -145,8 +145,13 @@ serves the usage stats (see *Usage stats* for the Firebase setup).
    the iPad to the app. Disable touch on the screen edges if needed.
 4. Set **Auto-Lock** to Never and keep the iPad on power.
 
+Safari’s address bar only goes away when the app is launched from the Home Screen
+icon (step 1): a page cannot hide it when the URL is opened in a Safari tab.
+
 The UI is designed on a 744 × 1133 canvas (iPad mini portrait). `Stage.tsx` scales
-it to fit any screen, letterboxed.
+it to fit any screen. On an iPad of another shape the canvas stays centred and the
+background and sign bar run to the screen edges, so there are no bars at the sides
+(`src/lib/stageFit.ts`; the Welcome artwork is never cropped).
 
 ## Project structure
 

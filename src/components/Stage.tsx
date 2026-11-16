@@ -1,18 +1,29 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { config } from '../lib/config';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { fitStage } from '../lib/stageFit';
 
-/** Scales the fixed 744×1133 design canvas to fit the screen, keeping its aspect ratio. */
+/**
+ * Scales the 744×1133 design canvas to fit the screen, keeping its aspect ratio. On a screen
+ * of another shape the stage is wider (or taller) than the canvas so it still fills the
+ * screen: the canvas sits in the middle and backgrounds run into the bleed (see app.css).
+ */
 export function Stage({ children }: { children: ReactNode }) {
-  const [scale, setScale] = useState(1);
+  const [fit, setFit] = useState(() => fitStage(window.innerWidth, window.innerHeight));
   useEffect(() => {
-    const fit = () => setScale(Math.min(window.innerWidth / config.stage.width, window.innerHeight / config.stage.height));
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
+    const refit = () => setFit(fitStage(window.innerWidth, window.innerHeight));
+    refit();
+    window.addEventListener('resize', refit);
+    return () => window.removeEventListener('resize', refit);
   }, []);
+  const style = {
+    width: fit.width,
+    height: fit.height,
+    transform: `scale(${fit.scale})`,
+    '--bleed-x': `${fit.bleedX}px`,
+    '--bleed-y': `${fit.bleedY}px`,
+  } as CSSProperties;
   return (
     <div className="viewport">
-      <div className="stage" style={{ transform: `scale(${scale})` }}>
+      <div className="stage" style={style}>
         {children}
       </div>
     </div>
